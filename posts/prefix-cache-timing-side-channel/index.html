@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head><meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1, minimal-ui">
+<meta http-equiv="X-UA-Compatible" content="ie=edge"><meta name="robots" content="index, follow"><meta name="author" content="">
+<meta name="description" content=""><link rel="manifest" href="/site.webmanifest"><link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="brain overflow" />
+<meta name="theme-color" content="#494f5c">
+<meta name="msapplication-TileColor" content="#494f5c">
+
+  <meta itemprop="name" content="KV Cache Timing Side-Channel in Multi-Tenant LLMs">
+  <meta itemprop="description" content="I built a small tool to test whether a managed inference provider’s prefix cache leaks timing information across tenant boundaries. Here’s what I found, how to run the same test yourself, and what providers should do about it.
+This post covers the timing side-channel — a known attack class I’m adding a concrete PoC and DIY testing guide to. My next post covers a novel application of the same shared-cache vulnerability in a DoS attack.">
+  <meta itemprop="datePublished" content="2026-04-25T01:51:22-07:00">
+  <meta itemprop="dateModified" content="2026-04-25T01:51:22-07:00">
+  <meta itemprop="wordCount" content="3156">
+  <meta itemprop="keywords" content="Research,Ai Security"><meta property="og:url" content="https://obormot.github.io/posts/prefix-cache-timing-side-channel/">
+  <meta property="og:site_name" content="brain overflow">
+  <meta property="og:title" content="KV Cache Timing Side-Channel in Multi-Tenant LLMs">
+  <meta property="og:description" content="I built a small tool to test whether a managed inference provider’s prefix cache leaks timing information across tenant boundaries. Here’s what I found, how to run the same test yourself, and what providers should do about it.
+This post covers the timing side-channel — a known attack class I’m adding a concrete PoC and DIY testing guide to. My next post covers a novel application of the same shared-cache vulnerability in a DoS attack.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-04-25T01:51:22-07:00">
+    <meta property="article:modified_time" content="2026-04-25T01:51:22-07:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="KV Cache Timing Side-Channel in Multi-Tenant LLMs">
+  <meta name="twitter:description" content="I built a small tool to test whether a managed inference provider’s prefix cache leaks timing information across tenant boundaries. Here’s what I found, how to run the same test yourself, and what providers should do about it.
+This post covers the timing side-channel — a known attack class I’m adding a concrete PoC and DIY testing guide to. My next post covers a novel application of the same shared-cache vulnerability in a DoS attack.">
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "KV Cache Timing Side-Channel in Multi-Tenant LLMs",
+    "name": "KV Cache Timing Side-Channel in Multi-Tenant LLMs",
+    "description": "I built a small tool to test whether a managed inference provider\u0026rsquo;s prefix cache leaks timing information across tenant boundaries. Here\u0026rsquo;s what I found, how to run the same test yourself, and what providers should do about it.\nThis post covers the timing side-channel — a known attack class I\u0026rsquo;m adding a concrete PoC and DIY testing guide to. My next post covers a novel application of the same shared-cache vulnerability in a DoS attack.\n",
+    "keywords": [],
+    "articleBody": "I built a small tool to test whether a managed inference provider’s prefix cache leaks timing information across tenant boundaries. Here’s what I found, how to run the same test yourself, and what providers should do about it.\nThis post covers the timing side-channel — a known attack class I’m adding a concrete PoC and DIY testing guide to. My next post covers a novel application of the same shared-cache vulnerability in a DoS attack.\nTL;DR Modern LLM inference servers cache the KV tensors produced during prompt prefill and reuse them when a later request shares a prefix. Cache hits can be 10–40× faster than cold prefill — a legitimate and widely deployed optimization. If the cache is shared across tenants without per-tenant key scoping, it becomes a cross-tenant information channel.\nThe timing side-channel works a bit like a chosen-plaintext attack in classical crypto. Recovering a system prompt from scratch is infeasible: the token-space is astronomical. But an attacker with a reasonable hypothesis — drawn from a competitor’s public product, a job posting, a leaked doc — needs only to confirm it. The shared cache becomes a binary oracle: submit the candidate, observe time-to-first-token (TTFT), and the cache tells you whether you are right. On a local llama.cpp setup I measured a 17.8× hit/miss ratio; the correct candidate ranked first in tens of requests total.\nThe fix — tenant-scoped cache keys — is not deployed by default in most stacks. This post is about why that matters and how to check whether your provider has it.\nGet the code: PoC scripts live in my repo. See Testing your provider for how to run them.\n1. Prior art This attack class is not new; the academic literature here is solid:\nPROMPTPEEK (NDSS 2025, Wu et al.) is the most directly relevant prior work. It demonstrates a complete prompt recovery pipeline — not just hypothesis confirmation — using a local LLM as an inference oracle to refine partial-match candidates. It targets multi-tenant SaaS LLM deployments, achieves ~99% prompt recovery accuracy, and works against vLLM and SGLang.\nInputSnatch (Zheng et al., arXiv:2411.18191, 2024) demonstrates timing side-channel attacks against prefix caching in vLLM and SGLang, including token-by-token prompt reconstruction in chatbot scenarios. This is the canonical academic reference for the timing oracle in a single-node scope.\nCPU cache side-channels (Flush+Reload, Prime+Probe, etc.) from the 2010s provide the conceptual template. The LLM case is mechanically different but shares the structure: a shared microarchitectural resource, timing as the observation channel, tenant isolation as the missing primitive.\nThis post adds a concrete, runnable PoC against open-source inference software, empirical measurements on both consumer CPU hardware and a GPU, and a provider testing guide you can run against a real managed API.\n2. Background: prefix caching is standard Every production inference server does prefix caching. The reasoning: prefill is quadratic-ish in prompt length, decode is roughly linear in output length, and most production workloads have long system prompts that are identical across requests. Caching the KV tensors for the shared prefix lets each subsequent request skip straight to decoding the user-specific suffix.\nConcrete implementations:\nvLLM — --enable-prefix-caching (on by default in recent versions). Block-granular at 16 tokens. Keyed by token hash. Optional per-tenant isolation via a cache salt; see Section 8.1. SGLang — RadixAttention. Tree-structured, automatic. llama.cpp — --cache-reuse N. Reuses KV when ≥N prefix tokens match something in cache. TensorRT-LLM — KV cache reuse via kvCacheConfig.enableBlockReuse. LMCache — cluster-level extension turning per-node caches into a shared pool across nodes. All of the above, in their default configurations, key the cache only by the token sequence. If two tenants submit requests that share a prefix, they hit the same cache entry. The cache does not know, or care, which tenant put the entry there.\nThat property is desirable for batched inference inside a single tenant. It is a security gap when the same cache serves multiple distinct trust domains.\n3. Threat model flowchart LR subgraph Tenants[\"Tenants (isolated)\"] direction TB V[\"Victim Pod\"] A[\"Attacker Pod\"] V ~~~ A end subgraph Cluster[\"Shared Inference Cluster\"] direction TB S[\"Inference Server\"] K[(\"Shared KV Cache\")] S \u003c--\u003e K end V \u003c--\u003e S A \u003c--\u003e S System. A multi-tenant inference service. Each tenant has API access and submits standard completion requests. Tenants may share a node, or sit on different nodes behind a cache-aware router. TTFT is observable to the tenant — either via streaming response, or by timing any request with max_tokens=1.\nAttacker capability. One valid API key. No privileged access. No ability to inspect server state. Ability to time HTTP responses at millisecond resolution — trivially available from any HTTP client.\nAttacker goal. Confirm or recover another tenant’s system prompt or shared context. System prompts frequently contain business logic and tenant-specific instructions, embedded credentials or internal URLs (a common deployment mistake), references to internal architecture, and in RAG setups verbatim passages from private documents.\nOut of scope. Attacks requiring host access (kernel exploits, firmware, physical fabric taps). Attacks against model weights. Cache-based availability and cost attacks are covered in the companion post.\n4. The attack, mechanically The attacker:\nConstructs a candidate prefix — a hypothesis about another tenant’s system prompt. Sources: the victim’s public product, job postings, leaked docs, known templates. Appends a unique suffix (to avoid matching the attacker’s own prior probes). Submits and records TTFT. Compares against a pre-established baseline: is this TTFT in the cache-hit band, or the miss band? A result in the hit band means the candidate matches something cached by another tenant. Full prompt recovery — binary search, token-by-token enumeration, local-LLM-guided refinement — is out of scope here; PROMPTPEEK covers that end-to-end. This post focuses on a prerequisite question: is the environment vulnerable to cross-tenant cache attacks in the first place? If the timing signal is absent, none of the more sophisticated attacks are viable.\n5. Proof of concept I ran this in two environments: first on my MacBook Pro (Apple M4 Pro, llama.cpp with Metal acceleration) to establish the baseline signal locally without any cloud spend, then on a rented RTX 3090 GPU pod running vLLM to confirm the attack holds on the inference stack that managed providers actually use. Both show the same result — one probe, correct identification — at different absolute latency scales.\nSetup:\nllama-server from llama.cpp, release build with Metal acceleration Model: TinyLlama 1.1B (GGUF, ~670 MB) Hardware: Apple M4 Pro, 24 GB unified memory Server flags: -c 4096 --cache-reuse 16 -ngl 99 --port 8000 Two client processes (“tenants”):\nVictim (victim.py): loops every ~10 seconds, sends SECRET_PREFIX + with max_tokens=1. SECRET_PREFIX is a 743-token system prompt — realistic for a customer-support or internal tooling bot. Attacker (attacker.py): runs a baseline to characterize hit/miss TTFT distributions, then submits five candidate prefixes. The five candidates:\n# Candidate Relationship to secret 0 Same company name, different prompt body Near-miss 1 Same company, wrong escalation policy Shallow partial match 2 SECRET_PREFIX Exact match 3 Different company name, similar structure Unrelated 4 Entirely different domain Unrelated All candidates padded to approximately the same token count as SECRET_PREFIX (~743 tokens). Why this matters is covered in Section 6.\nBaseline (5 samples each):\nCondition Median TTFT Cold miss (unique UUID prefix, never cached) 195 ms Warm hit (prefix primed, then measured) 11 ms Ratio 17.8× The 17.8× ratio gives a detection threshold of ~97 ms (half the miss median). Any probe below that is, with high confidence, a cache hit.\nDetection (1 probe per candidate, padded to ~743–765 tokens):\nCandidate Raw tokens Norm tokens TTFT Classification ACME near-miss, different body 148 748 268 ms Miss ACME assistant, wrong escalation policy 386 746 269 ms Miss Exact match (SECRET_PREFIX) 743 743 45 ms Cache hit — ranked #1 Northwind Logistics (different company) 225 765 276 ms Miss Writing tutor, unrelated domain 146 746 268 ms Miss The exact-match candidate ranked first at ~45 ms, clearly separated from the cold-miss cluster of 268–276 ms. The miss candidates are tightly clustered because normalization brought all of them to within 20 tokens of each other.\nThe local result confirms the PoC works, but treat the absolute numbers with some skepticism: llama.cpp is single-threaded, so concurrent requests queue and inflate miss latency; Apple Silicon’s unified memory architecture produces different prefill timing characteristics than a discrete GPU. The vLLM replication below is the more representative data point for production inference stacks.\n5.1 vLLM replication on GPU This is a small-scale experiment — a single rented GPU pod, low concurrent load, a 3B model. Real production deployments differ in model size, cluster topology, and load patterns, all of which affect the absolute numbers. The goal here is to confirm the signal exists on the inference stack that providers actually use, not to quantify it at production scale.\nSetup:\nvLLM 0.19.1 with --enable-prefix-caching, block size 16 tokens Model: Qwen/Qwen2.5-3B-Instruct Hardware: RTX 3090 (24 GB VRAM), 32 vCPUs Server flags: --enable-prefix-caching --max-model-len 4096 SECRET_PREFIX is 3,714 characters / 619 tokens (exact count via vLLM’s /tokenize API — the common 4 chars/token English heuristic significantly overestimates for natural-language prose; this model tokenizes at ~6 chars/token). The victim’s initial cold prefill of this prefix took ~1,460 ms, reflecting both CUDA warmup overhead on first inference and the 619-token prefill pass.\nBaseline (5 samples each, prompts padded to 3,714 chars / ~619 tokens):\nCondition Median TTFT Cold miss (unique UUID-prefixed, never cached) 120 ms Warm hit (SECRET_PREFIX primed, then measured) 69 ms Ratio 1.75× The 1.75× ratio is specific to this setup — available VRAM, cluster load, hardware, virtualization layer, and network latency all affect the absolute numbers. In general, the ratio will vary, and a lower ratio doesn’t mean the attack doesn’t work: what matters is whether the hit and miss clusters are separable, which they were in both environments tested here.\nDetection (1 probe per candidate, candidates token-padded to ~619–636 tokens):\nCandidate Raw tokens TTFT Classification ACME near-miss, different body 126 → 630 padded 133 ms Miss ACME assistant, wrong escalation policy 348 → 636 padded 133 ms Miss Exact match (SECRET_PREFIX) 619 76 ms Cache hit — ranked #1 Northwind Logistics (different company) 194 → 626 padded 136 ms Miss Writing tutor, unrelated domain 127 → 631 padded 136 ms Miss The exact-match candidate ranked first at ~76 ms, clearly separated from the cold-miss cluster of 133–136 ms. The miss candidates are tightly clustered because they are padded to nearly equal token counts with neutral filler — equalizing length is critical; a shorter cold-miss candidate prefills faster than a longer cache-hit candidate and inverts the expected ranking.\n6. Measurement methodology Building this PoC surfaced three requirements for reliable signal worth documenting.\nPad all candidates to equal length. Prefill time scales with token count — a short miss can prefill faster than a long hit, inverting the ranking. Candidates must be padded to match the target prefix length. Character-count padding is imprecise since tokenization density varies by content type. The PoC calls the server’s tokenizer API (/tokenize) to measure and pad to an exact token count.\nOne probe per candidate. The first probe caches that candidate on the server, polluting the oracle — a second probe always hits the attacker’s own entry. One measurement per candidate per API key; re-probe with a fresh key or wait for eviction.\nVictim contention adds noise. In-flight victim requests can queue ahead and inflate the matching candidate’s TTFT on a given round. Taking min(TTFT) across multiple rounds handles it: misses never produce a reading near the hit floor regardless of how many rounds you take; genuine hits will produce at least one clean reading there.\n7. Testing your provider This is the part I built the tool for. If you use a managed GPU inference API and send sensitive system prompts, you can test whether the provider’s shared cache leaks across tenant boundaries in about 20 minutes. You need two separate accounts on the same provider — production and staging, two colleague accounts, whatever.\nThis is a self-assessment, not an attack. You’re testing infrastructure you pay for. Do not probe another organization’s prompts. If you find a shared cache without isolation, ask your provider whether they offer configurable per-tenant cache isolation — it may already exist as an opt-in feature, a contract tier, or a flag you can request.\nWhat you need Two API keys on the same provider and model endpoint (KEY_A, KEY_B) A model name supported by that provider (check their docs — e.g. meta-llama/Llama-3-8b-instruct); both accounts must use the same model for the cache to be shared The PoC scripts from my repo git clone https://github.com/obormot/llm-kv-cache-attacks-poc cd llm-kv-cache-attacks-poc pip install httpx Step 1 — verify connectivity curl -s https://api.your-provider.com/v1/completions \\ -H \"Authorization: Bearer $KEY_A\" \\ -H \"Content-Type: application/json\" \\ -d \"{\\\"model\\\":\\\"$MODEL\\\",\\\"prompt\\\":\\\"hi\\\",\\\"max_tokens\\\":1}\" | python3 -m json.tool With max_tokens=1 the total non-streaming round-trip ≈ TTFT.\nStep 2 — warm the victim cache (account A) export VLLM_URL=https://api.your-provider.com/v1/completions export MODEL= export API_KEY=$KEY_A python victim.py # loops every ~10s Wait for at least one “keepalive ok” log line (~20s), then leave it running.\nStep 3 — run the attacker (account B) With the victim still running:\nexport VLLM_URL=https://api.your-provider.com/v1/completions export MODEL= export API_KEY=$KEY_B python attacker.py This runs baseline characterization and candidate detection in one shot. The baseline output tells you the hit/miss ratio; the candidate TTFT ranking tells you whether cross-tenant cache sharing is live.\nNote: GPU-based inference produces lower hit/miss ratios than CPU/Apple Silicon because prefill throughput is much higher, compressing the absolute gap. My vLLM measurement on an RTX 3090 showed 1.75× — a modest ratio, but the candidate clusters were cleanly separable. The ratio alone is not the signal; the separation between the matching candidate and the rest of the field is. If the matching candidate ranks clearly below the cold-miss cluster, the cache is shared. If all candidates cluster together, either the cache is isolated or the victim hasn’t warmed it yet — confirm at least one “keepalive ok” log line and retry.\n8. Defenses 8.1 Tenant-scoped cache keys This is the fix that categorically eliminates the timing side-channel.\nKey the cache by HMAC(tenant_id, token_sequence) rather than by the token sequence alone. Cross-tenant hits become impossible; the side channel disappears because the shared primitive is gone.\nCost: zero within-tenant. Every tenant keeps the full prefix-caching benefit for their own traffic. You lose cross-tenant sharing — which should be the default stance anyway, and can be opted into for genuinely public prompts by scoping those entries to a public tenant identifier.\nvLLM’s implementation. vLLM ships this as a first-class feature documented under “Cache Isolation for Security”. The salt must derive from the tenant identity — e.g. HMAC(server_secret, tenant_id).\n8.2 TTFT jitter / Constant-time padding Add uniform random delay to first-token emission. Jitter raises the number of probes an attacker needs to distinguish hit from miss — the wider the jitter window relative to the hit/miss gap, the more samples required.\nThe trade-off: jitter adds artificial latency to every response, including legitimate ones. A window wide enough to meaningfully obscure a 50–100ms hit/miss gap degrades TTFT SLA for all tenants.\nConstant-time padding — holding first-token emission to a fixed ceiling — eliminates the signal entirely but effectively nullifies the business case for prefix caching.\nNeither approach addresses the root cause. The shared cache namespace remains intact; you are making it harder to read, not removing it. Both are anti-attack measures that raise attacker cost, but hurt legitimate users, making the measures impractical.\n8.3 Anomaly detection on probing patterns Probing has a characteristic signature: many requests from the same API key with the same prefix and monotonically varying suffixes, or the same suffix with systematically varying prefixes. Useful as a tripwire; not reliable prevention against a well-resourced attacker distributing probes across keys and time.\n9. Discussion 9.1 Why this is a multi-tenant problem Within a single tenant, prefix cache hits are a pure win — faster responses, lower compute cost, no security concern. The attack requires a cache serving two distinct trust domains from a shared namespace. That describes: managed inference APIs serving multiple paying customers; internal multi-team platforms where teams run on shared infrastructure; any inference endpoint behind a cache-aware router in front of a shared pool.\n9.2 Why it hasn’t been fixed Here is a Spectre/Meltdown parallel. CPU architects optimized for performance — speculative execution, shared branch predictors, unified caches — and the security consequences of sharing microarchitectural state across trust boundaries were not addressed. The fixes such as retpoline imposed 10–30% performance regressions that made deployment a business decision, not just an engineering one.\nThe same tension applies here. Tenant-scoped cache keys are the correct fix and not technically difficult. But they eliminate cross-tenant prefix sharing, which is where a meaningful fraction of the advertised throughput and latency gains come from in a densely-packed multi-tenant cluster. Deploying the fix means accepting a performance regression that has to be sold to product and finance — and in a market where TTFT and cost-per-token are the headline numbers, that conversation is slow.\nThe result is the same pattern seen post-Spectre: the vulnerability is documented, the fix is known, deployment lags because the economic incentive to ship the fix is weaker than the incentive to maintain the performance headline.\n9.3 On disclosure This attack is public — PROMPTPEEK and InputSnatch cover it thoroughly, and the PoC here adds reproducibility and a runnable verification tool without introducing a novel primitive. Nothing here requires formal coordinated disclosure, but operators of multi-tenant inference APIs who have not implemented tenant-scoped cache keys should treat this as a prompt to do so.\n10. Conclusion Prefix caching is one of the single most impactful optimizations in modern LLM serving. It is also a cross-tenant side channel by default, because the cache key is usually only the token sequence.\nConfirming a hypothesis about another tenant’s cached system prompt requires an API key, an HTTP client, and a handful of well-constructed probes — the correct candidate separated clearly from the field in both test environments. The PoC scripts in the repo make it reproducible without a research lab setup, and the provider testing guide in Section 7 gives anyone running a sensitive workload a practical way to check whether their provider has the fix deployed.\nTenant-scoped cache keys is a straighforward fix. The reason it is not yet default is not technical. This post is a small contribution to making the conversation louder.\nMy next post examines what else an attacker can do with a shared cache once confidentiality is off the table.\nAppendix A — Environment llama.cpp setup (Section 5):\nllama.cpp, release build with Metal acceleration Model: TinyLlama 1.1B (GGUF, ~670 MB) Hardware: Apple M4 Pro, 24 GB unified memory Server flags: -c 4096 --cache-reuse 16 -ngl 99 --port 8000 vLLM setup (Section 5.1):\nvLLM version: 0.19.1 Model: Qwen/Qwen2.5-3B-Instruct Hardware: RTX 3090 (24 GB VRAM), 32 vCPUs Server flags: --enable-prefix-caching --max-model-len 4096 --port 8000 KV cache block size: 16 tokens (vLLM default) No cache salt / tenant isolation configured (intentional — demonstrates the unmitigated attack surface) ",
+    "wordCount" : "3156",
+    "inLanguage": "en",
+    "datePublished": "2026-04-25T01:51:22-07:00",
+    "dateModified": "2026-04-25T01:51:22-07:00",
+    "author":{
+        "@type": "Person",
+        "name":  null ,},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://obormot.github.io/posts/prefix-cache-timing-side-channel/"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "brain overflow",
+      "description": "",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://obormot.github.io/favicon.ico"
+      }
+    }
+}
+</script><title>KV Cache Timing Side-Channel in Multi-Tenant LLMs</title><link rel="stylesheet dns-prefetch preconnect preload prefetch" as="style" media="screen" href="https://obormot.github.io/css/style.min.c1c763c6719166bd01d9de6877d8e24da94df47680465859953ad0da71d015f0.css" integrity="sha256-wcdjxnGRZr0B2d5od9jiTalN9HaARlhZlTrQ2nHQFfA=" crossorigin="anonymous">
+	</head>
+
+<body id="page">
+<header id="site-header">
+	<div class="hdr-wrapper section-inner">
+		<div class="hdr-left">
+			<div class="site-branding">
+				<a href="https://obormot.github.io/">brain overflow</a>
+			</div>
+			<nav class="site-nav hide-in-mobile"><a href="https://obormot.github.io/posts/">posts</a><a href="https://obormot.github.io/about/">about</a><a href="https://obormot.github.io/cv/">my CV</a></nav>
+		</div>
+		<div class="hdr-right hdr-icons">
+			<span class="hdr-links hide-in-mobile"><a href="https://www.linkedin.com/in/oskaribatullin" target="_blank" rel="noopener me" title="Linkedin"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a><a href="https://github.com/obormot" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path
+      d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+   </path>
+</svg></a></span><button id="share-btn" class="hdr-btn" title=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share-2">
+      <circle cx="18" cy="5" r="3"></circle>
+      <circle cx="6" cy="12" r="3"></circle>
+      <circle cx="18" cy="19" r="3"></circle>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+   </svg></button>
+ 
+<div id="share-links" class="animated fast">
+    
+    
+    
+    
+    <ul>
+        <li>
+            <a href="https://twitter.com/intent/tweet?hashtags=hermit2&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fprefix-cache-timing-side-channel%2f&amp;text=KV%20Cache%20Timing%20Side-Channel%20in%20Multi-Tenant%20LLMs" target="_blank" rel="noopener" aria-label="Share on X"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path class="st0" d="m21.3 21.1 -11.4 -18.2h-7.2l11.4 18.2zm-18.6 0 7.2 -6.6m4.2 -5 7.2 -6.6" />
+</svg></a>
+        </li>
+        <li>
+            <a href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fobormot.github.io%2fposts%2fprefix-cache-timing-side-channel%2f" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.threads.net/intent/post?text=KV%20Cache%20Timing%20Side-Channel%20in%20Multi-Tenant%20LLMs&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fprefix-cache-timing-side-channel%2f" target="_blank" rel="noopener" aria-label="Share on threads"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a14 14 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32l-1.757-1.18c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388q.163.07.321.142c1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69q-.362 0-.739.021c-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221"/></svg></a>
+        </li>
+        <li>
+            <a href="https://bsky.app/intent/compose?text=https%3a%2f%2fobormot.github.io%2fposts%2fprefix-cache-timing-side-channel%2f" target="_blank" rel="noopener" aria-label="Share on bluesky"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive">
+   <path
+      d="M12,10.899c-0.995,-1.934 -3.704,-5.54 -6.223,-7.318c-2.412,-1.703 -3.333,-1.408 -3.936,-1.136c-0.699,0.316 -0.826,1.388 -0.826,2.019c0,0.631 0.346,5.173 0.572,5.931c0.745,2.504 3.399,3.351 5.842,3.079c0.125,-0.018 0.252,-0.035 0.38,-0.051c-0.126,0.02 -0.252,0.037 -0.38,0.051c-3.581,0.531 -6.761,1.836 -2.59,6.48c4.589,4.75 6.289,-1.019 7.161,-3.944c0.872,2.925 1.877,8.486 7.079,3.944c3.906,-3.944 1.073,-5.949 -2.508,-6.48c-0.128,-0.014 -0.254,-0.031 -0.38,-0.051c0.128,0.016 0.255,0.033 0.38,0.051c2.443,0.272 5.097,-0.574 5.842,-3.079c0.226,-0.758 0.572,-5.3 0.572,-5.931c-0,-0.63 -0.127,-1.703 -0.826,-2.018c-0.603,-0.273 -1.524,-0.568 -3.936,1.135c-2.519,1.778 -5.228,5.384 -6.223,7.318Z" />
+</svg></a>
+        </li>
+        <li>
+            <a href="mailto:?subject=KV%20Cache%20Timing%20Side-Channel%20in%20Multi-Tenant%20LLMs&amp;body=https%3a%2f%2fobormot.github.io%2fposts%2fprefix-cache-timing-side-channel%2f" target="_self" rel="noopener" aria-label="Share on Email"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+   <polyline points="22,6 12,13 2,6"></polyline>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fprefix-cache-timing-side-channel%2f&amp;source=https%3a%2f%2fobormot.github.io%2f&amp;title=KV%20Cache%20Timing%20Side-Channel%20in%20Multi-Tenant%20LLMs&amp;summary=KV%20Cache%20Timing%20Side-Channel%20in%20Multi-Tenant%20LLMs%2c%20by%20%3cnil%3e%0a%0a%3cnil%3e%0a" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a>
+        </li>
+        <li>
+            <a href="#" onclick="linkShare(&#34;KV Cache Timing Side-Channel in Multi-Tenant LLMs&#34;,&#34;https://obormot.github.io/posts/prefix-cache-timing-side-channel/&#34;,&#34;KV Cache Timing Side-Channel in Multi-Tenant LLMs, by \u003cnil\u003e\n\n\u003cnil\u003e\n&#34;); return false;" target="_self" rel="noopener" aria-label="Copy Link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+   </svg></a>
+        </li>
+    </ul>
+</div><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+   </svg></button>
+		</div>
+	</div>
+</header>
+<div id="mobile-menu" class="animated fast">
+	<ul><li><a href="https://obormot.github.io/posts/">posts</a></li><li><a href="https://obormot.github.io/about/">about</a></li><li><a href="https://obormot.github.io/cv/">my CV</a></li></ul>
+</div>
+
+	<main class="site-main section-inner animated fadeIn faster"><article class="thin">
+			<header class="post-header">
+				<div class="post-date"><span>Apr 25, 2026</span></div>
+				<h1>KV Cache Timing Side-Channel in Multi-Tenant LLMs</h1>
+			</header>
+			<div class="post-description">
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+   </svg><span class="category"><a href="https://obormot.github.io/categories/research">research</a></span><span class="category"><a href="https://obormot.github.io/categories/ai-security">ai security</a></span></p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+   </svg>3156&nbsp  14 Minutes, 20 Seconds</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+   </svg>2026-04-25 01:51 -0700
+</p></div>
+			<hr class="post-end">
+			<div class="content">
+				 <p><em>I built a small tool to test whether a managed inference provider&rsquo;s prefix cache leaks timing information across tenant boundaries. Here&rsquo;s what I found, how to run the same test yourself, and what providers should do about it.</em></p>
+<p><em>This post covers the timing side-channel — a known attack class I&rsquo;m adding a concrete PoC and DIY testing guide to. My <a href="/posts/kv-cache-flood-dos/">next post</a> covers a novel application of the same shared-cache vulnerability in a DoS attack.</em></p>
+<hr>
+<h2 id="tldr">TL;DR<a href="#tldr" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Modern LLM inference servers cache the KV tensors produced during prompt prefill and reuse them when a later request shares a prefix. Cache hits can be 10–40× faster than cold prefill — a legitimate and widely deployed optimization. If the cache is shared across tenants without per-tenant key scoping, it becomes a cross-tenant information channel.</p>
+<p>The timing side-channel works a bit like a chosen-plaintext attack in classical crypto. Recovering a system prompt from scratch is infeasible: the token-space is astronomical. But an attacker with a reasonable hypothesis — drawn from a competitor&rsquo;s public product, a job posting, a leaked doc — needs only to <em>confirm</em> it. The shared cache becomes a binary oracle: submit the candidate, observe time-to-first-token (TTFT), and the cache tells you whether you are right. On a local llama.cpp setup I measured a 17.8× hit/miss ratio; the correct candidate ranked first in tens of requests total.</p>
+<p>The fix — tenant-scoped cache keys — is not deployed by default in most stacks. This post is about why that matters and how to check whether your provider has it.</p>
+<p><strong>Get the code:</strong> PoC scripts live in my repo. See <a href="#7-testing-your-provider">Testing your provider</a> for how to run them.</p>
+<hr>
+<h2 id="1-prior-art">1. Prior art<a href="#1-prior-art" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>This attack class is not new; the academic literature here is solid:</p>
+<p><strong>PROMPTPEEK</strong> (NDSS 2025, Wu et al.) is the most directly relevant prior work. It demonstrates a complete prompt recovery pipeline — not just hypothesis confirmation — using a local LLM as an inference oracle to refine partial-match candidates. It targets multi-tenant SaaS LLM deployments, achieves ~99% prompt recovery accuracy, and works against vLLM and SGLang.</p>
+<p><strong>InputSnatch</strong> (Zheng et al., arXiv:2411.18191, 2024) demonstrates timing side-channel attacks against prefix caching in vLLM and SGLang, including token-by-token prompt reconstruction in chatbot scenarios. This is the canonical academic reference for the timing oracle in a single-node scope.</p>
+<p><strong>CPU cache side-channels</strong> (Flush+Reload, Prime+Probe, etc.) from the 2010s provide the conceptual template. The LLM case is mechanically different but shares the structure: a shared microarchitectural resource, timing as the observation channel, tenant isolation as the missing primitive.</p>
+<p>This post adds a concrete, runnable PoC against open-source inference software, empirical measurements on both consumer CPU hardware and a GPU, and a provider testing guide you can run against a real managed API.</p>
+<hr>
+<h2 id="2-background-prefix-caching-is-standard">2. Background: prefix caching is standard<a href="#2-background-prefix-caching-is-standard" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Every production inference server does prefix caching. The reasoning: prefill is quadratic-ish in prompt length, decode is roughly linear in output length, and most production workloads have long system prompts that are identical across requests. Caching the KV tensors for the shared prefix lets each subsequent request skip straight to decoding the user-specific suffix.</p>
+<p>Concrete implementations:</p>
+<ul>
+<li><strong>vLLM</strong> — <code>--enable-prefix-caching</code> (on by default in recent versions). Block-granular at 16 tokens. Keyed by token hash. Optional per-tenant isolation via a cache salt; see Section 8.1.</li>
+<li><strong>SGLang</strong> — RadixAttention. Tree-structured, automatic.</li>
+<li><strong>llama.cpp</strong> — <code>--cache-reuse N</code>. Reuses KV when ≥N prefix tokens match something in cache.</li>
+<li><strong>TensorRT-LLM</strong> — KV cache reuse via <code>kvCacheConfig.enableBlockReuse</code>.</li>
+<li><strong>LMCache</strong> — cluster-level extension turning per-node caches into a shared pool across nodes.</li>
+</ul>
+<p>All of the above, in their default configurations, key the cache only by the token sequence. If two tenants submit requests that share a prefix, they hit the same cache entry. The cache does not know, or care, which tenant put the entry there.</p>
+<p>That property is desirable for batched inference inside a single tenant. It is a security gap when the same cache serves multiple distinct trust domains.</p>
+<hr>
+<h2 id="3-threat-model">3. Threat model<a href="#3-threat-model" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<pre class="mermaid">flowchart LR
+    subgraph Tenants["Tenants (isolated)"]
+        direction TB
+        V["Victim Pod"]
+        A["Attacker Pod"]
+        V ~~~ A
+    end
+
+    subgraph Cluster["Shared Inference Cluster"]
+        direction TB
+        S["Inference Server"]
+        K[("Shared KV Cache")]
+        S <--> K
+    end
+
+    V <--> S
+    A <--> S
+</pre><p><strong>System.</strong> A multi-tenant inference service. Each tenant has API access and submits standard completion requests. Tenants may share a node, or sit on different nodes behind a cache-aware router. TTFT is observable to the tenant — either via streaming response, or by timing any request with <code>max_tokens=1</code>.</p>
+<p><strong>Attacker capability.</strong> One valid API key. No privileged access. No ability to inspect server state. Ability to time HTTP responses at millisecond resolution — trivially available from any HTTP client.</p>
+<p><strong>Attacker goal.</strong> Confirm or recover another tenant&rsquo;s system prompt or shared context. System prompts frequently contain business logic and tenant-specific instructions, embedded credentials or internal URLs (a common deployment mistake), references to internal architecture, and in RAG setups verbatim passages from private documents.</p>
+<p><strong>Out of scope.</strong> Attacks requiring host access (kernel exploits, firmware, physical fabric taps). Attacks against model weights. Cache-based availability and cost attacks are covered in the companion post.</p>
+<hr>
+<h2 id="4-the-attack-mechanically">4. The attack, mechanically<a href="#4-the-attack-mechanically" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The attacker:</p>
+<ol>
+<li>Constructs a candidate prefix — a hypothesis about another tenant&rsquo;s system prompt. Sources: the victim&rsquo;s public product, job postings, leaked docs, known templates.</li>
+<li>Appends a unique suffix (to avoid matching the attacker&rsquo;s own prior probes).</li>
+<li>Submits and records TTFT.</li>
+<li>Compares against a pre-established baseline: is this TTFT in the cache-hit band, or the miss band?</li>
+</ol>
+<p>A result in the hit band means the candidate matches something cached by another tenant. Full prompt recovery — binary search, token-by-token enumeration, local-LLM-guided refinement — is out of scope here; PROMPTPEEK covers that end-to-end. This post focuses on a prerequisite question: is the environment vulnerable to cross-tenant cache attacks in the first place? If the timing signal is absent, none of the more sophisticated attacks are viable.</p>
+<hr>
+<h2 id="5-proof-of-concept">5. Proof of concept<a href="#5-proof-of-concept" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>I ran this in two environments: first on my MacBook Pro (Apple M4 Pro, llama.cpp with Metal acceleration) to establish the baseline signal locally without any cloud spend, then on a rented RTX 3090 GPU pod running vLLM to confirm the attack holds on the inference stack that managed providers actually use. Both show the same result — one probe, correct identification — at different absolute latency scales.</p>
+<p><strong>Setup:</strong></p>
+<ul>
+<li><code>llama-server</code> from llama.cpp, release build with Metal acceleration</li>
+<li>Model: TinyLlama 1.1B (GGUF, ~670 MB)</li>
+<li>Hardware: Apple M4 Pro, 24 GB unified memory</li>
+<li>Server flags: <code>-c 4096 --cache-reuse 16 -ngl 99 --port 8000</code></li>
+</ul>
+<p>Two client processes (&ldquo;tenants&rdquo;):</p>
+<ul>
+<li><strong>Victim</strong> (<code>victim.py</code>): loops every ~10 seconds, sends <code>SECRET_PREFIX + &lt;random user query&gt;</code> with <code>max_tokens=1</code>. <code>SECRET_PREFIX</code> is a 743-token system prompt — realistic for a customer-support or internal tooling bot.</li>
+<li><strong>Attacker</strong> (<code>attacker.py</code>): runs a baseline to characterize hit/miss TTFT distributions, then submits five candidate prefixes.</li>
+</ul>
+<p>The five candidates:</p>
+<table>
+  <thead>
+      <tr>
+          <th>#</th>
+          <th>Candidate</th>
+          <th>Relationship to secret</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>0</td>
+          <td>Same company name, different prompt body</td>
+          <td>Near-miss</td>
+      </tr>
+      <tr>
+          <td>1</td>
+          <td>Same company, wrong escalation policy</td>
+          <td>Shallow partial match</td>
+      </tr>
+      <tr>
+          <td>2</td>
+          <td><code>SECRET_PREFIX</code></td>
+          <td>Exact match</td>
+      </tr>
+      <tr>
+          <td>3</td>
+          <td>Different company name, similar structure</td>
+          <td>Unrelated</td>
+      </tr>
+      <tr>
+          <td>4</td>
+          <td>Entirely different domain</td>
+          <td>Unrelated</td>
+      </tr>
+  </tbody>
+</table>
+<p>All candidates padded to approximately the same token count as <code>SECRET_PREFIX</code> (~743 tokens). Why this matters is covered in Section 6.</p>
+<p><strong>Baseline (5 samples each):</strong></p>
+<p><img src="images/baseline_local.png" alt="Baseline hit vs miss TTFT distributions"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Condition</th>
+          <th>Median TTFT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Cold miss (unique UUID prefix, never cached)</td>
+          <td>195 ms</td>
+      </tr>
+      <tr>
+          <td>Warm hit (prefix primed, then measured)</td>
+          <td>11 ms</td>
+      </tr>
+      <tr>
+          <td>Ratio</td>
+          <td><strong>17.8×</strong></td>
+      </tr>
+  </tbody>
+</table>
+<p>The 17.8× ratio gives a detection threshold of ~97 ms (half the miss median). Any probe below that is, with high confidence, a cache hit.</p>
+<p><strong>Detection (1 probe per candidate, padded to ~743–765 tokens):</strong></p>
+<p><img src="images/detect_local.png" alt="Candidate detection results"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Candidate</th>
+          <th>Raw tokens</th>
+          <th>Norm tokens</th>
+          <th>TTFT</th>
+          <th>Classification</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>ACME near-miss, different body</td>
+          <td>148</td>
+          <td>748</td>
+          <td>268 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>ACME assistant, wrong escalation policy</td>
+          <td>386</td>
+          <td>746</td>
+          <td>269 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Exact match (<code>SECRET_PREFIX</code>)</td>
+          <td>743</td>
+          <td>743</td>
+          <td><strong>45 ms</strong></td>
+          <td>Cache hit — ranked #1</td>
+      </tr>
+      <tr>
+          <td>Northwind Logistics (different company)</td>
+          <td>225</td>
+          <td>765</td>
+          <td>276 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Writing tutor, unrelated domain</td>
+          <td>146</td>
+          <td>746</td>
+          <td>268 ms</td>
+          <td>Miss</td>
+      </tr>
+  </tbody>
+</table>
+<p>The exact-match candidate ranked first at ~45 ms, clearly separated from the cold-miss cluster of 268–276 ms. The miss candidates are tightly clustered because normalization brought all of them to within 20 tokens of each other.</p>
+<p>The local result confirms the PoC works, but treat the absolute numbers with some skepticism: llama.cpp is single-threaded, so concurrent requests queue and inflate miss latency; Apple Silicon&rsquo;s unified memory architecture produces different prefill timing characteristics than a discrete GPU. The vLLM replication below is the more representative data point for production inference stacks.</p>
+<h3 id="51-vllm-replication-on-gpu">5.1 vLLM replication on GPU<a href="#51-vllm-replication-on-gpu" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>This is a small-scale experiment — a single rented GPU pod, low concurrent load, a 3B model. Real production deployments differ in model size, cluster topology, and load patterns, all of which affect the absolute numbers. The goal here is to confirm the signal exists on the inference stack that providers actually use, not to quantify it at production scale.</p>
+<p><strong>Setup:</strong></p>
+<ul>
+<li>vLLM 0.19.1 with <code>--enable-prefix-caching</code>, block size 16 tokens</li>
+<li>Model: <code>Qwen/Qwen2.5-3B-Instruct</code></li>
+<li>Hardware: RTX 3090 (24 GB VRAM), 32 vCPUs</li>
+<li>Server flags: <code>--enable-prefix-caching --max-model-len 4096</code></li>
+</ul>
+<p><code>SECRET_PREFIX</code> is 3,714 characters / <strong>619 tokens</strong> (exact count via vLLM&rsquo;s <code>/tokenize</code> API — the common 4 chars/token English heuristic significantly overestimates for natural-language prose; this model tokenizes at ~6 chars/token). The victim&rsquo;s initial cold prefill of this prefix took ~1,460 ms, reflecting both CUDA warmup overhead on first inference and the 619-token prefill pass.</p>
+<p><strong>Baseline (5 samples each, prompts padded to 3,714 chars / ~619 tokens):</strong></p>
+<p><img src="images/baseline_vllm.png" alt="Baseline hit vs miss TTFT distributions"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Condition</th>
+          <th>Median TTFT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Cold miss (unique UUID-prefixed, never cached)</td>
+          <td>120 ms</td>
+      </tr>
+      <tr>
+          <td>Warm hit (SECRET_PREFIX primed, then measured)</td>
+          <td>69 ms</td>
+      </tr>
+      <tr>
+          <td>Ratio</td>
+          <td><strong>1.75×</strong></td>
+      </tr>
+  </tbody>
+</table>
+<p>The 1.75× ratio is specific to this setup — available VRAM, cluster load, hardware, virtualization layer, and network latency all affect the absolute numbers. In general, the ratio will vary, and a lower ratio doesn&rsquo;t mean the attack doesn&rsquo;t work: what matters is whether the hit and miss clusters are separable, which they were in both environments tested here.</p>
+<p><strong>Detection (1 probe per candidate, candidates token-padded to ~619–636 tokens):</strong></p>
+<p><img src="images/detect_vllm.png" alt="Candidate detection results"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Candidate</th>
+          <th>Raw tokens</th>
+          <th>TTFT</th>
+          <th>Classification</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>ACME near-miss, different body</td>
+          <td>126 → 630 padded</td>
+          <td>133 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>ACME assistant, wrong escalation policy</td>
+          <td>348 → 636 padded</td>
+          <td>133 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Exact match (<code>SECRET_PREFIX</code>)</td>
+          <td>619</td>
+          <td><strong>76 ms</strong></td>
+          <td>Cache hit — ranked #1</td>
+      </tr>
+      <tr>
+          <td>Northwind Logistics (different company)</td>
+          <td>194 → 626 padded</td>
+          <td>136 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Writing tutor, unrelated domain</td>
+          <td>127 → 631 padded</td>
+          <td>136 ms</td>
+          <td>Miss</td>
+      </tr>
+  </tbody>
+</table>
+<p>The exact-match candidate ranked first at ~76 ms, clearly separated from the cold-miss cluster of 133–136 ms. The miss candidates are tightly clustered because they are padded to nearly equal token counts with neutral filler — equalizing length is critical; a shorter cold-miss candidate prefills faster than a longer cache-hit candidate and inverts the expected ranking.</p>
+<hr>
+<h2 id="6-measurement-methodology">6. Measurement methodology<a href="#6-measurement-methodology" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Building this PoC surfaced three requirements for reliable signal worth documenting.</p>
+<p><strong>Pad all candidates to equal length.</strong> Prefill time scales with token count — a short miss can prefill faster than a long hit, inverting the ranking. Candidates must be padded to match the target prefix length. Character-count padding is imprecise since tokenization density varies by content type. The PoC calls the server&rsquo;s tokenizer API (<code>/tokenize</code>) to measure and pad to an exact token count.</p>
+<p><strong>One probe per candidate.</strong> The first probe caches that candidate on the server, polluting the oracle — a second probe always hits the attacker&rsquo;s own entry. One measurement per candidate per API key; re-probe with a fresh key or wait for eviction.</p>
+<p><strong>Victim contention adds noise.</strong> In-flight victim requests can queue ahead and inflate the matching candidate&rsquo;s TTFT on a given round. Taking <code>min(TTFT)</code> across multiple rounds handles it: misses never produce a reading near the hit floor regardless of how many rounds you take; genuine hits will produce at least one clean reading there.</p>
+<hr>
+<h2 id="7-testing-your-provider">7. Testing your provider<a href="#7-testing-your-provider" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>This is the part I built the tool for. If you use a managed GPU inference API and send sensitive system prompts, you can test whether the provider&rsquo;s shared cache leaks across tenant boundaries in about 20 minutes. You need two separate accounts on the same provider — production and staging, two colleague accounts, whatever.</p>
+<p><strong>This is a self-assessment, not an attack.</strong> You&rsquo;re testing infrastructure you pay for. Do not probe another organization&rsquo;s prompts. If you find a shared cache without isolation, ask your provider whether they offer configurable per-tenant cache isolation — it may already exist as an opt-in feature, a contract tier, or a flag you can request.</p>
+<h3 id="what-you-need">What you need<a href="#what-you-need" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<ul>
+<li>Two API keys on the same provider and model endpoint (<code>KEY_A</code>, <code>KEY_B</code>)</li>
+<li>A model name supported by that provider (check their docs — e.g. <code>meta-llama/Llama-3-8b-instruct</code>); both accounts must use the same model for the cache to be shared</li>
+<li>The PoC scripts from <a href="https://github.com/obormot/llm-kv-cache-attacks-poc">my repo</a></li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/obormot/llm-kv-cache-attacks-poc
+</span></span><span style="display:flex;"><span>cd llm-kv-cache-attacks-poc
+</span></span><span style="display:flex;"><span>pip install httpx
+</span></span></code></pre></div><h3 id="step-1--verify-connectivity">Step 1 — verify connectivity<a href="#step-1--verify-connectivity" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl -s https://api.your-provider.com/v1/completions <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span>  -H <span style="color:#e6db74">&#34;Authorization: Bearer </span>$KEY_A<span style="color:#e6db74">&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span>  -H <span style="color:#e6db74">&#34;Content-Type: application/json&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span>  -d <span style="color:#e6db74">&#34;{\&#34;model\&#34;:\&#34;</span>$MODEL<span style="color:#e6db74">\&#34;,\&#34;prompt\&#34;:\&#34;hi\&#34;,\&#34;max_tokens\&#34;:1}&#34;</span> | python3 -m json.tool
+</span></span></code></pre></div><p>With <code>max_tokens=1</code> the total non-streaming round-trip ≈ TTFT.</p>
+<h3 id="step-2--warm-the-victim-cache-account-a">Step 2 — warm the victim cache (account A)<a href="#step-2--warm-the-victim-cache-account-a" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export VLLM_URL<span style="color:#f92672">=</span>https://api.your-provider.com/v1/completions
+</span></span><span style="display:flex;"><span>export MODEL<span style="color:#f92672">=</span>&lt;model-name&gt;
+</span></span><span style="display:flex;"><span>export API_KEY<span style="color:#f92672">=</span>$KEY_A
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>python victim.py   <span style="color:#75715e"># loops every ~10s</span>
+</span></span></code></pre></div><p>Wait for at least one &ldquo;keepalive ok&rdquo; log line (~20s), then leave it running.</p>
+<h3 id="step-3--run-the-attacker-account-b">Step 3 — run the attacker (account B)<a href="#step-3--run-the-attacker-account-b" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>With the victim still running:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export VLLM_URL<span style="color:#f92672">=</span>https://api.your-provider.com/v1/completions
+</span></span><span style="display:flex;"><span>export MODEL<span style="color:#f92672">=</span>&lt;model-name&gt;
+</span></span><span style="display:flex;"><span>export API_KEY<span style="color:#f92672">=</span>$KEY_B
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>python attacker.py
+</span></span></code></pre></div><p>This runs baseline characterization and candidate detection in one shot. The baseline output tells you the hit/miss ratio; the candidate TTFT ranking tells you whether cross-tenant cache sharing is live.</p>
+<p>Note: GPU-based inference produces lower hit/miss ratios than CPU/Apple Silicon because prefill throughput is much higher, compressing the absolute gap. My vLLM measurement on an RTX 3090 showed 1.75× — a modest ratio, but the candidate clusters were cleanly separable. The ratio alone is not the signal; the separation between the matching candidate and the rest of the field is. If the matching candidate ranks clearly below the cold-miss cluster, the cache is shared. If all candidates cluster together, either the cache is isolated or the victim hasn&rsquo;t warmed it yet — confirm at least one &ldquo;keepalive ok&rdquo; log line and retry.</p>
+<hr>
+<h2 id="8-defenses">8. Defenses<a href="#8-defenses" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<h3 id="81-tenant-scoped-cache-keys">8.1 Tenant-scoped cache keys<a href="#81-tenant-scoped-cache-keys" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>This is the fix that categorically eliminates the timing side-channel.</p>
+<p>Key the cache by <code>HMAC(tenant_id, token_sequence)</code> rather than by the token sequence alone. Cross-tenant hits become impossible; the side channel disappears because the shared primitive is gone.</p>
+<p><strong>Cost:</strong> zero within-tenant. Every tenant keeps the full prefix-caching benefit for their own traffic. You lose cross-tenant sharing — which should be the default stance anyway, and can be opted into for genuinely public prompts by scoping those entries to a <code>public</code> tenant identifier.</p>
+<p><strong>vLLM&rsquo;s implementation.</strong> vLLM ships this as a first-class feature documented under <a href="https://docs.vllm.ai/en/latest/design/prefix_caching/">&ldquo;Cache Isolation for Security&rdquo;</a>. The salt must derive from the tenant identity — e.g. <code>HMAC(server_secret, tenant_id)</code>.</p>
+<h3 id="82-ttft-jitter--constant-time-padding">8.2 TTFT jitter / Constant-time padding<a href="#82-ttft-jitter--constant-time-padding" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Add uniform random delay to first-token emission. Jitter raises the number of probes an attacker needs to distinguish hit from miss — the wider the jitter window relative to the hit/miss gap, the more samples required.</p>
+<p>The trade-off: jitter adds artificial latency to every response, including legitimate ones. A window wide enough to meaningfully obscure a 50–100ms hit/miss gap degrades TTFT SLA for all tenants.</p>
+<p>Constant-time padding — holding first-token emission to a fixed ceiling — eliminates the signal entirely but effectively nullifies the business case for prefix caching.</p>
+<p>Neither approach addresses the root cause. The shared cache namespace remains intact; you are making it harder to read, not removing it. Both are anti-attack measures that raise attacker cost, but hurt legitimate users, making the measures impractical.</p>
+<h3 id="83-anomaly-detection-on-probing-patterns">8.3 Anomaly detection on probing patterns<a href="#83-anomaly-detection-on-probing-patterns" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Probing has a characteristic signature: many requests from the same API key with the same prefix and monotonically varying suffixes, or the same suffix with systematically varying prefixes. Useful as a tripwire; not reliable prevention against a well-resourced attacker distributing probes across keys and time.</p>
+<hr>
+<h2 id="9-discussion">9. Discussion<a href="#9-discussion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<h3 id="91-why-this-is-a-multi-tenant-problem">9.1 Why this is a multi-tenant problem<a href="#91-why-this-is-a-multi-tenant-problem" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Within a single tenant, prefix cache hits are a pure win — faster responses, lower compute cost, no security concern. The attack requires a cache serving two distinct trust domains from a shared namespace. That describes: managed inference APIs serving multiple paying customers; internal multi-team platforms where teams run on shared infrastructure; any inference endpoint behind a cache-aware router in front of a shared pool.</p>
+<h3 id="92-why-it-hasnt-been-fixed">9.2 Why it hasn&rsquo;t been fixed<a href="#92-why-it-hasnt-been-fixed" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Here is a Spectre/Meltdown parallel. CPU architects optimized for performance — speculative execution, shared branch predictors, unified caches — and the security consequences of sharing microarchitectural state across trust boundaries were not addressed. The fixes such as retpoline imposed 10–30% performance regressions that made deployment a business decision, not just an engineering one.</p>
+<p>The same tension applies here. Tenant-scoped cache keys are the correct fix and not technically difficult. But they eliminate cross-tenant prefix sharing, which is where a meaningful fraction of the advertised throughput and latency gains come from in a densely-packed multi-tenant cluster. Deploying the fix means accepting a performance regression that has to be sold to product and finance — and in a market where TTFT and cost-per-token are the headline numbers, that conversation is slow.</p>
+<p>The result is the same pattern seen post-Spectre: the vulnerability is documented, the fix is known, deployment lags because the economic incentive to ship the fix is weaker than the incentive to maintain the performance headline.</p>
+<h3 id="93-on-disclosure">9.3 On disclosure<a href="#93-on-disclosure" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>This attack is public — PROMPTPEEK and InputSnatch cover it thoroughly, and the PoC here adds reproducibility and a runnable verification tool without introducing a novel primitive. Nothing here requires formal coordinated disclosure, but operators of multi-tenant inference APIs who have not implemented tenant-scoped cache keys should treat this as a prompt to do so.</p>
+<hr>
+<h2 id="10-conclusion">10. Conclusion<a href="#10-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Prefix caching is one of the single most impactful optimizations in modern LLM serving. It is also a cross-tenant side channel by default, because the cache key is usually only the token sequence.</p>
+<p>Confirming a hypothesis about another tenant&rsquo;s cached system prompt requires an API key, an HTTP client, and a handful of well-constructed probes — the correct candidate separated clearly from the field in both test environments. The PoC scripts in the repo make it reproducible without a research lab setup, and the provider testing guide in Section 7 gives anyone running a sensitive workload a practical way to check whether their provider has the fix deployed.</p>
+<p>Tenant-scoped cache keys is a straighforward fix. The reason it is not yet default is not technical. This post is a small contribution to making the conversation louder.</p>
+<p>My next post examines what else an attacker can do with a shared cache once confidentiality is off the table.</p>
+<hr>
+<h2 id="appendix-a--environment">Appendix A — Environment<a href="#appendix-a--environment" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p><strong>llama.cpp setup (Section 5):</strong></p>
+<ul>
+<li>llama.cpp, release build with Metal acceleration</li>
+<li>Model: TinyLlama 1.1B (GGUF, ~670 MB)</li>
+<li>Hardware: Apple M4 Pro, 24 GB unified memory</li>
+<li>Server flags: <code>-c 4096 --cache-reuse 16 -ngl 99 --port 8000</code></li>
+</ul>
+<p><strong>vLLM setup (Section 5.1):</strong></p>
+<ul>
+<li>vLLM version: 0.19.1</li>
+<li>Model: <code>Qwen/Qwen2.5-3B-Instruct</code></li>
+<li>Hardware: RTX 3090 (24 GB VRAM), 32 vCPUs</li>
+<li>Server flags: <code>--enable-prefix-caching --max-model-len 4096 --port 8000</code></li>
+<li>KV cache block size: 16 tokens (vLLM default)</li>
+<li>No cache salt / tenant isolation configured (intentional — demonstrates the unmitigated attack surface)</li>
+</ul>
+<hr>
+
+			</div>
+			
+		</article>
+		<div class="post-nav thin">
+			<a class="next-post" href="https://obormot.github.io/posts/kv-cache-flood-dos/">
+				<span class="post-nav-label"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left">
+      <line x1="19" y1="12" x2="5" y2="12"></line>
+      <polyline points="12 19 5 12 12 5"></polyline>
+   </svg>&nbsp;</span><br><span>KV Cache Flood: DoS Against Multi-Tenant LLMs</span>
+			</a>
+		</div>
+		<div id="comments" class="thin"></div>
+	</main>
+<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+<p>
+	&copy; 2026 <a href="https://obormot.github.io/">brain overflow</a>
+	&#183; 
+	
+	</p></footer>
+<script async src="https://obormot.github.io/js/main.min.0d576c274958ef57c819bb15e6a752b006c7d7982fefe4b3581ba126929d0de2.js" integrity="sha256-DVdsJ0lY71fIGbsV5qdSsAbH15gv7+SzWBuhJpKdDeI=" crossorigin="anonymous"></script><script async src="https://obormot.github.io/js/social-share.min.24409a4f6e5537d70ffc55ec8f9192208d718678cb8638585342423020b37f39.js" integrity="sha256-JECaT25VN9cP/FXsj5GSII1xhnjLhjhYU0JCMCCzfzk=" crossorigin="anonymous"></script><script defer async type="module">
+    import mermaid from 'https:\/\/cdn.jsdelivr.net\/npm\/mermaid\/dist\/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true,theme: 'dark' });
+  </script></body>
+</html>

@@ -1,0 +1,721 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+	<channel>
+		<title>Ai Security on brain overflow</title>
+		<link>https://obormot.github.io/categories/ai-security/</link>
+		<description>Recent content in Ai Security on brain overflow</description>
+		<generator>Hugo -- 0.160.1</generator>
+		<language>en-us</language>
+		<lastBuildDate>Mon, 27 Apr 2026 01:53:01 -0700</lastBuildDate>
+		<atom:link href="https://obormot.github.io/categories/ai-security/index.xml" rel="self" type="application/rss+xml" />
+		
+		
+		<item>
+			<title>KV Cache Flood: DoS Against Multi-Tenant LLMs</title>
+			<link>https://obormot.github.io/posts/kv-cache-flood-dos/</link>
+			<pubDate>Mon, 27 Apr 2026 01:53:01 -0700</pubDate><guid>https://obormot.github.io/posts/kv-cache-flood-dos/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em><a href="/posts/prefix-cache-timing-side-channel/">My previous post</a> covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker&rsquo;s favor.</em></p>
+<hr>
+<h2 id="tldr">TL;DR<a href="#tldr" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Every token prefilled by an LLM inference server can be cached. If you evict another tenant&rsquo;s cached prefix, every one of their subsequent requests pays full cold-prefill cost until they re-warm it — at which point you evict it again. The attacker sends requests that generate only a single output token (near-zero compute cost) but carry long prompts that fill cache blocks. The victim pays for repeated full re-prefill at scale. On a shared RTX 3090 running vLLM, 4 flood threads caused significant TTFT degradation peaking at <strong>9.7×</strong> within the first minute.</p>
+<p>Weaponized cache eviction is a well-known attack class: Prime+Probe fills CPU cache sets with attacker data to evict a victim&rsquo;s lines; CDN cache-busting floods origin servers by bypassing edge caches with unique URLs. I haven&rsquo;t seen it applied to LLM KV caches, which is what I describe here.</p>
+<blockquote>
+<p>⚠️ <strong>DISCLAIMER: Research purposes only.</strong> Run <code>flooder.py</code> only against infrastructure you own or have explicit written permission to test. Pointing it at a shared provider is a DoS attack, whether or not their cache is isolated.</p>
+</blockquote>
+<hr>
+<h2 id="1-the-shared-cache-surface">1. The shared-cache surface<a href="#1-the-shared-cache-surface" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The foundation is covered in <a href="/posts/prefix-cache-timing-side-channel/">my earlier post</a>, but here is a quick recap: production LLM inference servers (vLLM, SGLang, llama.cpp, TensorRT-LLM) cache the KV tensors produced during prefill and reuse them when a later request shares a prefix. In their default configurations, these caches are keyed only by the token sequence — not by tenant identity. When the same cache serves multiple tenants, two tenants with identical prompt prefixes hit the same cache entry, and two tenants with different prompt prefixes compete for the same LRU eviction pool.</p>
+<pre class="mermaid">flowchart LR
+    subgraph Tenants["Tenants (isolated)"]
+        direction TB
+        V["Victim Pod"]
+        A["Attacker Pod"]
+        V ~~~ A
+    end
+
+    subgraph Cluster["Shared Inference Cluster"]
+        direction TB
+        S["Inference Server"]
+        K[("Shared KV Cache")]
+        S <--> K
+    end
+
+    V <--> S
+    A <--> S
+</pre><p>That last point is this post. The timing side-channel I described earlier is a <em>read</em> on the shared cache. This attack is a <em>write</em> — deliberately filling the shared pool to evict a target tenant&rsquo;s entries.</p>
+<hr>
+<h2 id="2-the-attack-mechanically">2. The attack, mechanically<a href="#2-the-attack-mechanically" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The mechanism is LRU eviction pressure. vLLM (and most other servers) use an LRU policy over a fixed KV cache pool. When the pool is full, the least recently used blocks are evicted. The attacker submits a sustained stream of requests with unique long prefixes, each filling cache blocks with attacker-owned entries. Under sustained pressure, the victim&rsquo;s hot prefix blocks are displaced. The victim re-prefills from cold on their next request — potentially thousands of tokens — then re-warms, at which point the flood displaces them again.</p>
+<pre class="mermaid">flowchart LR
+    subgraph S1["1. Warm cache"]
+        direction TB
+        a_top["[ MRU ]"]:::label
+        a1["Victim prefix block"]:::victim
+        a2["Victim prefix block"]:::victim
+        a3["Victim prefix block"]:::victim
+        a_bot["[ LRU ]"]:::label
+        a_top --- a1
+        a1 --- a2
+        a2 --- a3
+        a3 --- a_bot
+    end
+
+    subgraph S2["2. Flood writes garbage"]
+        direction TB
+        b_top["[ MRU ]"]:::label
+        b1["Attacker garbage"]:::attacker
+        b2["Attacker garbage"]:::attacker
+        b3["Victim prefix block"]:::victim
+        b_bot["[ LRU - evict next ]"]:::label
+        b_top --- b1
+        b1 --- b2
+        b2 --- b3
+        b3 --- b_bot
+    end
+
+    subgraph S3["3. Victim evicted"]
+        direction TB
+        c_top["[ MRU ]"]:::label
+        c1["Attacker garbage"]:::attacker
+        c2["Attacker garbage"]:::attacker
+        c3["Attacker garbage"]:::attacker
+        c_bot["[ LRU ]"]:::label
+        c_top --- c1
+        c1 --- c2
+        c2 --- c3
+        c3 --- c_bot
+    end
+
+    S1 ==>|"flood begins"| S2
+    S2 ==>|"flood continues,<br/>victim ages out"| S3
+
+    classDef victim fill:#cfe8ff,stroke:#3b82f6,color:#1e40af
+    classDef attacker fill:#ffe4cc,stroke:#ea580c,color:#9a3412
+    classDef label fill:none,stroke:none,color:#888
+</pre><p>The attacker&rsquo;s requests use <code>max_tokens=1</code> asking the model to stop after generating a single output token. Output generation is where most GPU compute goes; by minimizing output, the attacker lowers their own cost while maximizing cache pressure.</p>
+<p><code>flooder.py</code> implements the core flood loop in a few lines:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">flood_worker</span>(stop_event, counter):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#f92672">not</span> stop_event<span style="color:#f92672">.</span>is_set():
+</span></span><span style="display:flex;"><span>        prompt <span style="color:#f92672">=</span> unique_garbage_prompt()   <span style="color:#75715e"># long unique prefix — fills cache blocks, never matches victim</span>
+</span></span><span style="display:flex;"><span>        send_request(prompt, max_tokens<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>) <span style="color:#75715e"># fire and forget; 1 output token = minimal compute cost</span>
+</span></span><span style="display:flex;"><span>        counter[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span></code></pre></div><p>in 4 concurrent looping threads. The script measures TTFT before the flood, during, and after — as a stand-in for what a real victim tenant would observe. In a real multi-tenant deployment, the victim is a co-tenant sending their own requests: their TTFT is fast when their prefix is in cache, and spikes when the attacker&rsquo;s flood displaces those blocks — with no visibility into why. That is the impact the measurements below represent.</p>
+<hr>
+<h2 id="3-attack-economics">3. Attack economics<a href="#3-attack-economics" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The core impact is TTFT degradation and throughput loss. Like any DoS attack, the attacker must sustain the pressure — once the flood stops, the victim re-warms on their next request and recovers immediately. The cost angle is worth noting but depends heavily on the provider&rsquo;s pricing structure: providers that discount cached input tokens make cache misses expensive for the victim; providers that charge a premium for cache writes make flooding expensive for the attacker; pay-per-hour GPU deployments see the impact as throughput loss rather than a direct billing difference. The primary harm is latency degradation regardless of billing model.</p>
+<p><strong>Model size amplifies the attack surface.</strong> KV cache memory scales linearly with sequence length — each additional token adds a fixed amount of VRAM. What changes with model size is how much VRAM is left over for the cache after model weights are loaded. Larger models leave less headroom, and the attacker&rsquo;s flood only needs to fill that available space to trigger eviction. Operators running large models on minimum-viable hardware are the most exposed.</p>
+<hr>
+<h2 id="4-test-results">4. Test results<a href="#4-test-results" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>I ran the flood PoC in two environments: a local llama.cpp setup on my Apple M4 Pro laptop, and a GPU pod running vLLM on an RTX 3090. Both confirmed the attack. The local result is stronger in relative terms because llama.cpp is single-threaded, so flood threads add queuing contention on top of the cache eviction effect.</p>
+<h3 id="41-llamacpp--apple-m4-pro--tinyllama-11b">4.1 llama.cpp · Apple M4 Pro · TinyLlama 1.1B<a href="#41-llamacpp--apple-m4-pro--tinyllama-11b" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>4 flood threads, 60-second flood window, ~400-token garbage prompts. The victim&rsquo;s <code>SECRET_PREFIX</code> is ~619 tokens.</p>
+<p><img src="images/flood_timeline_local.png" alt="Cache flood attack timeline — local"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Phase</th>
+          <th>Victim TTFT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Before flood (cache warm)</td>
+          <td>31 ms</td>
+      </tr>
+      <tr>
+          <td>During flood — t=20s</td>
+          <td>1178 ms</td>
+      </tr>
+      <tr>
+          <td>During flood — t=45s</td>
+          <td>1315 ms</td>
+      </tr>
+      <tr>
+          <td>During flood — t=68s</td>
+          <td>1342 ms</td>
+      </tr>
+      <tr>
+          <td>After flood — first probe</td>
+          <td>284 ms</td>
+      </tr>
+      <tr>
+          <td>After re-prime (recovered)</td>
+          <td>33 ms</td>
+      </tr>
+      <tr>
+          <td><strong>Sustained degradation factor</strong></td>
+          <td><strong>42.8×</strong></td>
+      </tr>
+  </tbody>
+</table>
+<p>The flood sent 110 requests in 60 seconds. The extreme degradation factor reflects both eviction and contention: llama.cpp processes requests sequentially, so 4 concurrent flood threads also act as a request queue, stacking latency on the victim&rsquo;s probes during the flood window.</p>
+<h3 id="42-vllm-0191--rtx-3090--qwen25-3b-instruct">4.2 vLLM 0.19.1 · RTX 3090 · Qwen2.5-3B-Instruct<a href="#42-vllm-0191--rtx-3090--qwen25-3b-instruct" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Same parameters. vLLM batches requests, so flood threads contribute less queuing contention — the degradation reflects mostly cache eviction.</p>
+<p><img src="images/flood_timeline.png" alt="Cache flood attack timeline — GPU"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Phase</th>
+          <th>Victim TTFT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Before flood (cache warm)</td>
+          <td>73 ms</td>
+      </tr>
+      <tr>
+          <td>During flood — t=20s</td>
+          <td>670 ms</td>
+      </tr>
+      <tr>
+          <td>During flood — t=42s</td>
+          <td>701 ms</td>
+      </tr>
+      <tr>
+          <td>During flood — t=64s</td>
+          <td>582 ms</td>
+      </tr>
+      <tr>
+          <td>After flood — first probe</td>
+          <td>113 ms</td>
+      </tr>
+      <tr>
+          <td>After re-prime (recovered)</td>
+          <td>93 ms</td>
+      </tr>
+      <tr>
+          <td><strong>Sustained degradation factor</strong></td>
+          <td><strong>9.7×</strong></td>
+      </tr>
+  </tbody>
+</table>
+<p>The flood sent 423 requests in 60 seconds.</p>
+<p>Two effects compound during the flood. The primary effect is cache eviction: the victim&rsquo;s cached prefix blocks are displaced, forcing full cold prefill. The secondary effect is request queuing contention: flood threads compete for GPU compute. Both effects are visible in the peak reading of 701 ms — well above the 113 ms cold-miss latency measured immediately after the flood stopped. An attacker with more threads or a higher request rate would see higher contention and correspondingly higher victim TTFT.</p>
+<p>The first post-flood probe confirms eviction (cold miss in both environments). Recovery takes exactly one request. This means the attacker must sustain the flood continuously to maintain the degradation — but nothing about the attack requires it to be a one-shot event.</p>
+<hr>
+<h2 id="5-why-detection-is-hard">5. Why detection is hard<a href="#5-why-detection-is-hard" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>From the provider&rsquo;s side, the flooder looks like a high-volume legitimate customer: diverse prompts, many requests, short outputs — indistinguishable from a batch inference workload without per-tenant cache-hit-rate monitoring. Standard rate limiting misses it if the attacker stays within their tier. The victim sees elevated TTFT and higher-than-expected input token costs but has no direct visibility into what caused the eviction.</p>
+<p>The distinguishing signals that <em>could</em> catch it:</p>
+<ul>
+<li><strong>Per-tenant cache write rate</strong> (bytes/sec and blocks/sec) anomalously high from one API key</li>
+<li><strong>Per-tenant cache hit rate</strong> for the victim anomalously low relative to their historical baseline</li>
+<li><strong>Correlation</strong> between victim hit-rate drops and attacker write-rate spikes</li>
+</ul>
+<p>None of these are surfaced by default in vLLM&rsquo;s metrics.</p>
+<hr>
+<h2 id="6-defenses">6. Defenses<a href="#6-defenses" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>If you&rsquo;re building a multi-tenant product on top of a self-hosted inference server — an API wrapper, an agent platform, a SaaS product where multiple customers share a vLLM or SGLang backend — this attack applies to you directly. The server doesn&rsquo;t know your tenants exist; it sees one request queue and one cache pool. A single misbehaving or malicious customer can degrade service for everyone else, and nothing in the default configuration stops them. The mitigations below are things you need to add.</p>
+<p><strong>Per-tenant cache footprint quotas</strong> directly address the flood. Each tenant gets a quota of cache blocks; eviction targets are chosen proportionally within the offending tenant&rsquo;s allocation rather than globally. A tenant filling the pool with garbage only displaces their own entries, not other tenants&rsquo;. Rate-limiting cache writes per tenant (blocks/sec) is the enforcement mechanism.</p>
+<p><strong>Tenant-scoped cache keys</strong> (the fix described in the companion post) also eliminate the flood attack entirely as a side effect. If each tenant&rsquo;s entries are keyed with their identity, there is no shared pool to flood — a garbage entry from attacker key A can never displace a legitimate entry from victim key B, because they exist in logically separate namespaces. This is the cleaner fix, but it requires changes to the cache key derivation that per-tenant quotas do not.</p>
+<p><strong>Defenses observed in practice.</strong> Anthropic&rsquo;s <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching">prompt caching</a> largely neutralizes any economic asymmetry in the flood attack. Cache writes are billed at a premium (1.25× base input rate for 5-minute TTL, 2× for 1-hour), so the attacker pays more per token than a normal request. There is a <strong>minimum cacheable prompt size</strong> (1024–4096 tokens depending on model), so each flood request must be substantial to even register a cache write. The net economics: the attacker pays 1.25× base input rate per flood request; each flooded victim request that misses cache pays 1.0× instead of the usual 0.1× — a 10× cost increase for the victim. The attacker&rsquo;s per-token cost is only marginally higher than the per-victim damage they cause, though the aggregate victim impact grows with victim count. In practice, sustaining enough flood volume on a managed API to matter would likely trip rate limits before the economics become interesting.</p>
+<hr>
+<h2 id="7-conclusion">7. Conclusion<a href="#7-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The shared KV cache is not just an information channel — it is also a resource that can be weaponized against co-tenants. The attack requires one API key and a loop. The attacker minimizes output tokens; the victim pays for repeated full re-prefill. Whether that translates into a cost advantage for the attacker depends on the deployment&rsquo;s pricing structure, but the latency degradation is real regardless.</p>
+<p>The root cause is the same as for the timing side-channel: cache entries are keyed by token sequence without tenant identity. The mitigations are tenant-scoped cache keys, per-tenant cache quotas, and rate limits — or economic leverage that raises the attacker&rsquo;s cost: write premiums and minimum cacheable prompt sizes.</p>
+<hr>
+]]></content>
+		</item>
+		
+		<item>
+			<title>KV Cache Timing Side-Channel in Multi-Tenant LLMs</title>
+			<link>https://obormot.github.io/posts/prefix-cache-timing-side-channel/</link>
+			<pubDate>Sat, 25 Apr 2026 01:51:22 -0700</pubDate><guid>https://obormot.github.io/posts/prefix-cache-timing-side-channel/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>I built a small tool to test whether a managed inference provider&rsquo;s prefix cache leaks timing information across tenant boundaries. Here&rsquo;s what I found, how to run the same test yourself, and what providers should do about it.</em></p>
+<p><em>This post covers the timing side-channel — a known attack class I&rsquo;m adding a concrete PoC and DIY testing guide to. My <a href="/posts/kv-cache-flood-dos/">next post</a> covers a novel application of the same shared-cache vulnerability in a DoS attack.</em></p>
+<hr>
+<h2 id="tldr">TL;DR<a href="#tldr" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Modern LLM inference servers cache the KV tensors produced during prompt prefill and reuse them when a later request shares a prefix. Cache hits can be 10–40× faster than cold prefill — a legitimate and widely deployed optimization. If the cache is shared across tenants without per-tenant key scoping, it becomes a cross-tenant information channel.</p>
+<p>The timing side-channel works a bit like a chosen-plaintext attack in classical crypto. Recovering a system prompt from scratch is infeasible: the token-space is astronomical. But an attacker with a reasonable hypothesis — drawn from a competitor&rsquo;s public product, a job posting, a leaked doc — needs only to <em>confirm</em> it. The shared cache becomes a binary oracle: submit the candidate, observe time-to-first-token (TTFT), and the cache tells you whether you are right. On a local llama.cpp setup I measured a 17.8× hit/miss ratio; the correct candidate ranked first in tens of requests total.</p>
+<p>The fix — tenant-scoped cache keys — is not deployed by default in most stacks. This post is about why that matters and how to check whether your provider has it.</p>
+<p><strong>Get the code:</strong> PoC scripts live in my repo. See <a href="#7-testing-your-provider">Testing your provider</a> for how to run them.</p>
+<hr>
+<h2 id="1-prior-art">1. Prior art<a href="#1-prior-art" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>This attack class is not new; the academic literature here is solid:</p>
+<p><strong>PROMPTPEEK</strong> (NDSS 2025, Wu et al.) is the most directly relevant prior work. It demonstrates a complete prompt recovery pipeline — not just hypothesis confirmation — using a local LLM as an inference oracle to refine partial-match candidates. It targets multi-tenant SaaS LLM deployments, achieves ~99% prompt recovery accuracy, and works against vLLM and SGLang.</p>
+<p><strong>InputSnatch</strong> (Zheng et al., arXiv:2411.18191, 2024) demonstrates timing side-channel attacks against prefix caching in vLLM and SGLang, including token-by-token prompt reconstruction in chatbot scenarios. This is the canonical academic reference for the timing oracle in a single-node scope.</p>
+<p><strong>CPU cache side-channels</strong> (Flush+Reload, Prime+Probe, etc.) from the 2010s provide the conceptual template. The LLM case is mechanically different but shares the structure: a shared microarchitectural resource, timing as the observation channel, tenant isolation as the missing primitive.</p>
+<p>This post adds a concrete, runnable PoC against open-source inference software, empirical measurements on both consumer CPU hardware and a GPU, and a provider testing guide you can run against a real managed API.</p>
+<hr>
+<h2 id="2-background-prefix-caching-is-standard">2. Background: prefix caching is standard<a href="#2-background-prefix-caching-is-standard" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Every production inference server does prefix caching. The reasoning: prefill is quadratic-ish in prompt length, decode is roughly linear in output length, and most production workloads have long system prompts that are identical across requests. Caching the KV tensors for the shared prefix lets each subsequent request skip straight to decoding the user-specific suffix.</p>
+<p>Concrete implementations:</p>
+<ul>
+<li><strong>vLLM</strong> — <code>--enable-prefix-caching</code> (on by default in recent versions). Block-granular at 16 tokens. Keyed by token hash. Optional per-tenant isolation via a cache salt; see Section 8.1.</li>
+<li><strong>SGLang</strong> — RadixAttention. Tree-structured, automatic.</li>
+<li><strong>llama.cpp</strong> — <code>--cache-reuse N</code>. Reuses KV when ≥N prefix tokens match something in cache.</li>
+<li><strong>TensorRT-LLM</strong> — KV cache reuse via <code>kvCacheConfig.enableBlockReuse</code>.</li>
+<li><strong>LMCache</strong> — cluster-level extension turning per-node caches into a shared pool across nodes.</li>
+</ul>
+<p>All of the above, in their default configurations, key the cache only by the token sequence. If two tenants submit requests that share a prefix, they hit the same cache entry. The cache does not know, or care, which tenant put the entry there.</p>
+<p>That property is desirable for batched inference inside a single tenant. It is a security gap when the same cache serves multiple distinct trust domains.</p>
+<hr>
+<h2 id="3-threat-model">3. Threat model<a href="#3-threat-model" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<pre class="mermaid">flowchart LR
+    subgraph Tenants["Tenants (isolated)"]
+        direction TB
+        V["Victim Pod"]
+        A["Attacker Pod"]
+        V ~~~ A
+    end
+
+    subgraph Cluster["Shared Inference Cluster"]
+        direction TB
+        S["Inference Server"]
+        K[("Shared KV Cache")]
+        S <--> K
+    end
+
+    V <--> S
+    A <--> S
+</pre><p><strong>System.</strong> A multi-tenant inference service. Each tenant has API access and submits standard completion requests. Tenants may share a node, or sit on different nodes behind a cache-aware router. TTFT is observable to the tenant — either via streaming response, or by timing any request with <code>max_tokens=1</code>.</p>
+<p><strong>Attacker capability.</strong> One valid API key. No privileged access. No ability to inspect server state. Ability to time HTTP responses at millisecond resolution — trivially available from any HTTP client.</p>
+<p><strong>Attacker goal.</strong> Confirm or recover another tenant&rsquo;s system prompt or shared context. System prompts frequently contain business logic and tenant-specific instructions, embedded credentials or internal URLs (a common deployment mistake), references to internal architecture, and in RAG setups verbatim passages from private documents.</p>
+<p><strong>Out of scope.</strong> Attacks requiring host access (kernel exploits, firmware, physical fabric taps). Attacks against model weights. Cache-based availability and cost attacks are covered in the companion post.</p>
+<hr>
+<h2 id="4-the-attack-mechanically">4. The attack, mechanically<a href="#4-the-attack-mechanically" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The attacker:</p>
+<ol>
+<li>Constructs a candidate prefix — a hypothesis about another tenant&rsquo;s system prompt. Sources: the victim&rsquo;s public product, job postings, leaked docs, known templates.</li>
+<li>Appends a unique suffix (to avoid matching the attacker&rsquo;s own prior probes).</li>
+<li>Submits and records TTFT.</li>
+<li>Compares against a pre-established baseline: is this TTFT in the cache-hit band, or the miss band?</li>
+</ol>
+<p>A result in the hit band means the candidate matches something cached by another tenant. Full prompt recovery — binary search, token-by-token enumeration, local-LLM-guided refinement — is out of scope here; PROMPTPEEK covers that end-to-end. This post focuses on a prerequisite question: is the environment vulnerable to cross-tenant cache attacks in the first place? If the timing signal is absent, none of the more sophisticated attacks are viable.</p>
+<hr>
+<h2 id="5-proof-of-concept">5. Proof of concept<a href="#5-proof-of-concept" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>I ran this in two environments: first on my MacBook Pro (Apple M4 Pro, llama.cpp with Metal acceleration) to establish the baseline signal locally without any cloud spend, then on a rented RTX 3090 GPU pod running vLLM to confirm the attack holds on the inference stack that managed providers actually use. Both show the same result — one probe, correct identification — at different absolute latency scales.</p>
+<p><strong>Setup:</strong></p>
+<ul>
+<li><code>llama-server</code> from llama.cpp, release build with Metal acceleration</li>
+<li>Model: TinyLlama 1.1B (GGUF, ~670 MB)</li>
+<li>Hardware: Apple M4 Pro, 24 GB unified memory</li>
+<li>Server flags: <code>-c 4096 --cache-reuse 16 -ngl 99 --port 8000</code></li>
+</ul>
+<p>Two client processes (&ldquo;tenants&rdquo;):</p>
+<ul>
+<li><strong>Victim</strong> (<code>victim.py</code>): loops every ~10 seconds, sends <code>SECRET_PREFIX + &lt;random user query&gt;</code> with <code>max_tokens=1</code>. <code>SECRET_PREFIX</code> is a 743-token system prompt — realistic for a customer-support or internal tooling bot.</li>
+<li><strong>Attacker</strong> (<code>attacker.py</code>): runs a baseline to characterize hit/miss TTFT distributions, then submits five candidate prefixes.</li>
+</ul>
+<p>The five candidates:</p>
+<table>
+  <thead>
+      <tr>
+          <th>#</th>
+          <th>Candidate</th>
+          <th>Relationship to secret</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>0</td>
+          <td>Same company name, different prompt body</td>
+          <td>Near-miss</td>
+      </tr>
+      <tr>
+          <td>1</td>
+          <td>Same company, wrong escalation policy</td>
+          <td>Shallow partial match</td>
+      </tr>
+      <tr>
+          <td>2</td>
+          <td><code>SECRET_PREFIX</code></td>
+          <td>Exact match</td>
+      </tr>
+      <tr>
+          <td>3</td>
+          <td>Different company name, similar structure</td>
+          <td>Unrelated</td>
+      </tr>
+      <tr>
+          <td>4</td>
+          <td>Entirely different domain</td>
+          <td>Unrelated</td>
+      </tr>
+  </tbody>
+</table>
+<p>All candidates padded to approximately the same token count as <code>SECRET_PREFIX</code> (~743 tokens). Why this matters is covered in Section 6.</p>
+<p><strong>Baseline (5 samples each):</strong></p>
+<p><img src="images/baseline_local.png" alt="Baseline hit vs miss TTFT distributions"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Condition</th>
+          <th>Median TTFT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Cold miss (unique UUID prefix, never cached)</td>
+          <td>195 ms</td>
+      </tr>
+      <tr>
+          <td>Warm hit (prefix primed, then measured)</td>
+          <td>11 ms</td>
+      </tr>
+      <tr>
+          <td>Ratio</td>
+          <td><strong>17.8×</strong></td>
+      </tr>
+  </tbody>
+</table>
+<p>The 17.8× ratio gives a detection threshold of ~97 ms (half the miss median). Any probe below that is, with high confidence, a cache hit.</p>
+<p><strong>Detection (1 probe per candidate, padded to ~743–765 tokens):</strong></p>
+<p><img src="images/detect_local.png" alt="Candidate detection results"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Candidate</th>
+          <th>Raw tokens</th>
+          <th>Norm tokens</th>
+          <th>TTFT</th>
+          <th>Classification</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>ACME near-miss, different body</td>
+          <td>148</td>
+          <td>748</td>
+          <td>268 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>ACME assistant, wrong escalation policy</td>
+          <td>386</td>
+          <td>746</td>
+          <td>269 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Exact match (<code>SECRET_PREFIX</code>)</td>
+          <td>743</td>
+          <td>743</td>
+          <td><strong>45 ms</strong></td>
+          <td>Cache hit — ranked #1</td>
+      </tr>
+      <tr>
+          <td>Northwind Logistics (different company)</td>
+          <td>225</td>
+          <td>765</td>
+          <td>276 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Writing tutor, unrelated domain</td>
+          <td>146</td>
+          <td>746</td>
+          <td>268 ms</td>
+          <td>Miss</td>
+      </tr>
+  </tbody>
+</table>
+<p>The exact-match candidate ranked first at ~45 ms, clearly separated from the cold-miss cluster of 268–276 ms. The miss candidates are tightly clustered because normalization brought all of them to within 20 tokens of each other.</p>
+<p>The local result confirms the PoC works, but treat the absolute numbers with some skepticism: llama.cpp is single-threaded, so concurrent requests queue and inflate miss latency; Apple Silicon&rsquo;s unified memory architecture produces different prefill timing characteristics than a discrete GPU. The vLLM replication below is the more representative data point for production inference stacks.</p>
+<h3 id="51-vllm-replication-on-gpu">5.1 vLLM replication on GPU<a href="#51-vllm-replication-on-gpu" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>This is a small-scale experiment — a single rented GPU pod, low concurrent load, a 3B model. Real production deployments differ in model size, cluster topology, and load patterns, all of which affect the absolute numbers. The goal here is to confirm the signal exists on the inference stack that providers actually use, not to quantify it at production scale.</p>
+<p><strong>Setup:</strong></p>
+<ul>
+<li>vLLM 0.19.1 with <code>--enable-prefix-caching</code>, block size 16 tokens</li>
+<li>Model: <code>Qwen/Qwen2.5-3B-Instruct</code></li>
+<li>Hardware: RTX 3090 (24 GB VRAM), 32 vCPUs</li>
+<li>Server flags: <code>--enable-prefix-caching --max-model-len 4096</code></li>
+</ul>
+<p><code>SECRET_PREFIX</code> is 3,714 characters / <strong>619 tokens</strong> (exact count via vLLM&rsquo;s <code>/tokenize</code> API — the common 4 chars/token English heuristic significantly overestimates for natural-language prose; this model tokenizes at ~6 chars/token). The victim&rsquo;s initial cold prefill of this prefix took ~1,460 ms, reflecting both CUDA warmup overhead on first inference and the 619-token prefill pass.</p>
+<p><strong>Baseline (5 samples each, prompts padded to 3,714 chars / ~619 tokens):</strong></p>
+<p><img src="images/baseline_vllm.png" alt="Baseline hit vs miss TTFT distributions"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Condition</th>
+          <th>Median TTFT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Cold miss (unique UUID-prefixed, never cached)</td>
+          <td>120 ms</td>
+      </tr>
+      <tr>
+          <td>Warm hit (SECRET_PREFIX primed, then measured)</td>
+          <td>69 ms</td>
+      </tr>
+      <tr>
+          <td>Ratio</td>
+          <td><strong>1.75×</strong></td>
+      </tr>
+  </tbody>
+</table>
+<p>The 1.75× ratio is specific to this setup — available VRAM, cluster load, hardware, virtualization layer, and network latency all affect the absolute numbers. In general, the ratio will vary, and a lower ratio doesn&rsquo;t mean the attack doesn&rsquo;t work: what matters is whether the hit and miss clusters are separable, which they were in both environments tested here.</p>
+<p><strong>Detection (1 probe per candidate, candidates token-padded to ~619–636 tokens):</strong></p>
+<p><img src="images/detect_vllm.png" alt="Candidate detection results"></p>
+<table>
+  <thead>
+      <tr>
+          <th>Candidate</th>
+          <th>Raw tokens</th>
+          <th>TTFT</th>
+          <th>Classification</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>ACME near-miss, different body</td>
+          <td>126 → 630 padded</td>
+          <td>133 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>ACME assistant, wrong escalation policy</td>
+          <td>348 → 636 padded</td>
+          <td>133 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Exact match (<code>SECRET_PREFIX</code>)</td>
+          <td>619</td>
+          <td><strong>76 ms</strong></td>
+          <td>Cache hit — ranked #1</td>
+      </tr>
+      <tr>
+          <td>Northwind Logistics (different company)</td>
+          <td>194 → 626 padded</td>
+          <td>136 ms</td>
+          <td>Miss</td>
+      </tr>
+      <tr>
+          <td>Writing tutor, unrelated domain</td>
+          <td>127 → 631 padded</td>
+          <td>136 ms</td>
+          <td>Miss</td>
+      </tr>
+  </tbody>
+</table>
+<p>The exact-match candidate ranked first at ~76 ms, clearly separated from the cold-miss cluster of 133–136 ms. The miss candidates are tightly clustered because they are padded to nearly equal token counts with neutral filler — equalizing length is critical; a shorter cold-miss candidate prefills faster than a longer cache-hit candidate and inverts the expected ranking.</p>
+<hr>
+<h2 id="6-measurement-methodology">6. Measurement methodology<a href="#6-measurement-methodology" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Building this PoC surfaced three requirements for reliable signal worth documenting.</p>
+<p><strong>Pad all candidates to equal length.</strong> Prefill time scales with token count — a short miss can prefill faster than a long hit, inverting the ranking. Candidates must be padded to match the target prefix length. Character-count padding is imprecise since tokenization density varies by content type. The PoC calls the server&rsquo;s tokenizer API (<code>/tokenize</code>) to measure and pad to an exact token count.</p>
+<p><strong>One probe per candidate.</strong> The first probe caches that candidate on the server, polluting the oracle — a second probe always hits the attacker&rsquo;s own entry. One measurement per candidate per API key; re-probe with a fresh key or wait for eviction.</p>
+<p><strong>Victim contention adds noise.</strong> In-flight victim requests can queue ahead and inflate the matching candidate&rsquo;s TTFT on a given round. Taking <code>min(TTFT)</code> across multiple rounds handles it: misses never produce a reading near the hit floor regardless of how many rounds you take; genuine hits will produce at least one clean reading there.</p>
+<hr>
+<h2 id="7-testing-your-provider">7. Testing your provider<a href="#7-testing-your-provider" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>This is the part I built the tool for. If you use a managed GPU inference API and send sensitive system prompts, you can test whether the provider&rsquo;s shared cache leaks across tenant boundaries in about 20 minutes. You need two separate accounts on the same provider — production and staging, two colleague accounts, whatever.</p>
+<p><strong>This is a self-assessment, not an attack.</strong> You&rsquo;re testing infrastructure you pay for. Do not probe another organization&rsquo;s prompts. If you find a shared cache without isolation, ask your provider whether they offer configurable per-tenant cache isolation — it may already exist as an opt-in feature, a contract tier, or a flag you can request.</p>
+<h3 id="what-you-need">What you need<a href="#what-you-need" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<ul>
+<li>Two API keys on the same provider and model endpoint (<code>KEY_A</code>, <code>KEY_B</code>)</li>
+<li>A model name supported by that provider (check their docs — e.g. <code>meta-llama/Llama-3-8b-instruct</code>); both accounts must use the same model for the cache to be shared</li>
+<li>The PoC scripts from <a href="https://github.com/obormot/llm-kv-cache-attacks-poc">my repo</a></li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/obormot/llm-kv-cache-attacks-poc
+</span></span><span style="display:flex;"><span>cd llm-kv-cache-attacks-poc
+</span></span><span style="display:flex;"><span>pip install httpx
+</span></span></code></pre></div><h3 id="step-1--verify-connectivity">Step 1 — verify connectivity<a href="#step-1--verify-connectivity" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl -s https://api.your-provider.com/v1/completions <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span>  -H <span style="color:#e6db74">&#34;Authorization: Bearer </span>$KEY_A<span style="color:#e6db74">&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span>  -H <span style="color:#e6db74">&#34;Content-Type: application/json&#34;</span> <span style="color:#ae81ff">\
+</span></span></span><span style="display:flex;"><span>  -d <span style="color:#e6db74">&#34;{\&#34;model\&#34;:\&#34;</span>$MODEL<span style="color:#e6db74">\&#34;,\&#34;prompt\&#34;:\&#34;hi\&#34;,\&#34;max_tokens\&#34;:1}&#34;</span> | python3 -m json.tool
+</span></span></code></pre></div><p>With <code>max_tokens=1</code> the total non-streaming round-trip ≈ TTFT.</p>
+<h3 id="step-2--warm-the-victim-cache-account-a">Step 2 — warm the victim cache (account A)<a href="#step-2--warm-the-victim-cache-account-a" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export VLLM_URL<span style="color:#f92672">=</span>https://api.your-provider.com/v1/completions
+</span></span><span style="display:flex;"><span>export MODEL<span style="color:#f92672">=</span>&lt;model-name&gt;
+</span></span><span style="display:flex;"><span>export API_KEY<span style="color:#f92672">=</span>$KEY_A
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>python victim.py   <span style="color:#75715e"># loops every ~10s</span>
+</span></span></code></pre></div><p>Wait for at least one &ldquo;keepalive ok&rdquo; log line (~20s), then leave it running.</p>
+<h3 id="step-3--run-the-attacker-account-b">Step 3 — run the attacker (account B)<a href="#step-3--run-the-attacker-account-b" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>With the victim still running:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>export VLLM_URL<span style="color:#f92672">=</span>https://api.your-provider.com/v1/completions
+</span></span><span style="display:flex;"><span>export MODEL<span style="color:#f92672">=</span>&lt;model-name&gt;
+</span></span><span style="display:flex;"><span>export API_KEY<span style="color:#f92672">=</span>$KEY_B
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>python attacker.py
+</span></span></code></pre></div><p>This runs baseline characterization and candidate detection in one shot. The baseline output tells you the hit/miss ratio; the candidate TTFT ranking tells you whether cross-tenant cache sharing is live.</p>
+<p>Note: GPU-based inference produces lower hit/miss ratios than CPU/Apple Silicon because prefill throughput is much higher, compressing the absolute gap. My vLLM measurement on an RTX 3090 showed 1.75× — a modest ratio, but the candidate clusters were cleanly separable. The ratio alone is not the signal; the separation between the matching candidate and the rest of the field is. If the matching candidate ranks clearly below the cold-miss cluster, the cache is shared. If all candidates cluster together, either the cache is isolated or the victim hasn&rsquo;t warmed it yet — confirm at least one &ldquo;keepalive ok&rdquo; log line and retry.</p>
+<hr>
+<h2 id="8-defenses">8. Defenses<a href="#8-defenses" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<h3 id="81-tenant-scoped-cache-keys">8.1 Tenant-scoped cache keys<a href="#81-tenant-scoped-cache-keys" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>This is the fix that categorically eliminates the timing side-channel.</p>
+<p>Key the cache by <code>HMAC(tenant_id, token_sequence)</code> rather than by the token sequence alone. Cross-tenant hits become impossible; the side channel disappears because the shared primitive is gone.</p>
+<p><strong>Cost:</strong> zero within-tenant. Every tenant keeps the full prefix-caching benefit for their own traffic. You lose cross-tenant sharing — which should be the default stance anyway, and can be opted into for genuinely public prompts by scoping those entries to a <code>public</code> tenant identifier.</p>
+<p><strong>vLLM&rsquo;s implementation.</strong> vLLM ships this as a first-class feature documented under <a href="https://docs.vllm.ai/en/latest/design/prefix_caching/">&ldquo;Cache Isolation for Security&rdquo;</a>. The salt must derive from the tenant identity — e.g. <code>HMAC(server_secret, tenant_id)</code>.</p>
+<h3 id="82-ttft-jitter--constant-time-padding">8.2 TTFT jitter / Constant-time padding<a href="#82-ttft-jitter--constant-time-padding" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Add uniform random delay to first-token emission. Jitter raises the number of probes an attacker needs to distinguish hit from miss — the wider the jitter window relative to the hit/miss gap, the more samples required.</p>
+<p>The trade-off: jitter adds artificial latency to every response, including legitimate ones. A window wide enough to meaningfully obscure a 50–100ms hit/miss gap degrades TTFT SLA for all tenants.</p>
+<p>Constant-time padding — holding first-token emission to a fixed ceiling — eliminates the signal entirely but effectively nullifies the business case for prefix caching.</p>
+<p>Neither approach addresses the root cause. The shared cache namespace remains intact; you are making it harder to read, not removing it. Both are anti-attack measures that raise attacker cost, but hurt legitimate users, making the measures impractical.</p>
+<h3 id="83-anomaly-detection-on-probing-patterns">8.3 Anomaly detection on probing patterns<a href="#83-anomaly-detection-on-probing-patterns" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Probing has a characteristic signature: many requests from the same API key with the same prefix and monotonically varying suffixes, or the same suffix with systematically varying prefixes. Useful as a tripwire; not reliable prevention against a well-resourced attacker distributing probes across keys and time.</p>
+<hr>
+<h2 id="9-discussion">9. Discussion<a href="#9-discussion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<h3 id="91-why-this-is-a-multi-tenant-problem">9.1 Why this is a multi-tenant problem<a href="#91-why-this-is-a-multi-tenant-problem" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Within a single tenant, prefix cache hits are a pure win — faster responses, lower compute cost, no security concern. The attack requires a cache serving two distinct trust domains from a shared namespace. That describes: managed inference APIs serving multiple paying customers; internal multi-team platforms where teams run on shared infrastructure; any inference endpoint behind a cache-aware router in front of a shared pool.</p>
+<h3 id="92-why-it-hasnt-been-fixed">9.2 Why it hasn&rsquo;t been fixed<a href="#92-why-it-hasnt-been-fixed" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Here is a Spectre/Meltdown parallel. CPU architects optimized for performance — speculative execution, shared branch predictors, unified caches — and the security consequences of sharing microarchitectural state across trust boundaries were not addressed. The fixes such as retpoline imposed 10–30% performance regressions that made deployment a business decision, not just an engineering one.</p>
+<p>The same tension applies here. Tenant-scoped cache keys are the correct fix and not technically difficult. But they eliminate cross-tenant prefix sharing, which is where a meaningful fraction of the advertised throughput and latency gains come from in a densely-packed multi-tenant cluster. Deploying the fix means accepting a performance regression that has to be sold to product and finance — and in a market where TTFT and cost-per-token are the headline numbers, that conversation is slow.</p>
+<p>The result is the same pattern seen post-Spectre: the vulnerability is documented, the fix is known, deployment lags because the economic incentive to ship the fix is weaker than the incentive to maintain the performance headline.</p>
+<h3 id="93-on-disclosure">9.3 On disclosure<a href="#93-on-disclosure" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>This attack is public — PROMPTPEEK and InputSnatch cover it thoroughly, and the PoC here adds reproducibility and a runnable verification tool without introducing a novel primitive. Nothing here requires formal coordinated disclosure, but operators of multi-tenant inference APIs who have not implemented tenant-scoped cache keys should treat this as a prompt to do so.</p>
+<hr>
+<h2 id="10-conclusion">10. Conclusion<a href="#10-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Prefix caching is one of the single most impactful optimizations in modern LLM serving. It is also a cross-tenant side channel by default, because the cache key is usually only the token sequence.</p>
+<p>Confirming a hypothesis about another tenant&rsquo;s cached system prompt requires an API key, an HTTP client, and a handful of well-constructed probes — the correct candidate separated clearly from the field in both test environments. The PoC scripts in the repo make it reproducible without a research lab setup, and the provider testing guide in Section 7 gives anyone running a sensitive workload a practical way to check whether their provider has the fix deployed.</p>
+<p>Tenant-scoped cache keys is a straighforward fix. The reason it is not yet default is not technical. This post is a small contribution to making the conversation louder.</p>
+<p>My next post examines what else an attacker can do with a shared cache once confidentiality is off the table.</p>
+<hr>
+<h2 id="appendix-a--environment">Appendix A — Environment<a href="#appendix-a--environment" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p><strong>llama.cpp setup (Section 5):</strong></p>
+<ul>
+<li>llama.cpp, release build with Metal acceleration</li>
+<li>Model: TinyLlama 1.1B (GGUF, ~670 MB)</li>
+<li>Hardware: Apple M4 Pro, 24 GB unified memory</li>
+<li>Server flags: <code>-c 4096 --cache-reuse 16 -ngl 99 --port 8000</code></li>
+</ul>
+<p><strong>vLLM setup (Section 5.1):</strong></p>
+<ul>
+<li>vLLM version: 0.19.1</li>
+<li>Model: <code>Qwen/Qwen2.5-3B-Instruct</code></li>
+<li>Hardware: RTX 3090 (24 GB VRAM), 32 vCPUs</li>
+<li>Server flags: <code>--enable-prefix-caching --max-model-len 4096 --port 8000</code></li>
+<li>KV cache block size: 16 tokens (vLLM default)</li>
+<li>No cache salt / tenant isolation configured (intentional — demonstrates the unmitigated attack surface)</li>
+</ul>
+<hr>
+]]></content>
+		</item>
+		
+	</channel>
+</rss>
