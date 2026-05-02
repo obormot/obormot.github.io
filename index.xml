@@ -6,9 +6,176 @@
 		<description>Recent content on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
-		<lastBuildDate>Mon, 27 Apr 2026 01:53:01 -0700</lastBuildDate>
+		<lastBuildDate>Sat, 02 May 2026 11:58:11 -0700</lastBuildDate>
 		<atom:link href="https://obormot.github.io/index.xml" rel="self" type="application/rss+xml" />
 		
+		
+		<item>
+			<title>copy.fail: From kernel CVE to Kubernetes Container Escape</title>
+			<link>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</link>
+			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>My <a href="/posts/prefix-cache-timing-side-channel/">previous posts</a> looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other&rsquo;s data and starve each other&rsquo;s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache. The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.</em></p>
+<p><em>The xint.io team published <a href="https://xint.io/blog/copy-fail-linux-distributions">a writeup of the LPE vector</a>; as of time of this post their container-escape follow-up is not yet out. This post covers a concrete container escape chain against Talos Linux and what the vulnerability class says about shared-kernel container security.</em></p>
+<hr>
+<h2 id="tldr">TL;DR<a href="#tldr" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p><em>copy.fail</em> is a local privilege escalation — but the xint.io authors note it can also be used to escape Kubernetes pods. How? Containers on the same node share the host kernel, and through it, the page cache: the kernel&rsquo;s in-memory representation of file contents. <em>copy.fail</em> lets an unprivileged process corrupt those pages. If two containers share an image layer, they share page-cache pages for every file in it. Corrupt the right file in a layer shared with a privileged container, and you get code execution in that container&rsquo;s context.</p>
+<p>Talos Linux — a minimal, immutable OS for Kubernetes with no shell, no SSH, and a read-only root filesystem — is a concrete example where this plays out. On Talos worker nodes, kube-proxy and user workload containers share an overlayfs layer containing <code>/usr/sbin/nft</code>. kube-proxy calls <code>nft</code> as root every few seconds to reconcile nftables rules. An attacker in an unprivileged pod overwrites <code>nft</code>&rsquo;s page-cache pages with shellcode and waits. The next reconciliation tick executes it as root, with access to the host filesystem.</p>
+<p>At the end I discuss how microVM and sandboxed runtime architectures address this class of vulnerability by construction.</p>
+<hr>
+<h2 id="1-background-the-copyfail-primitive">1. Background: the copy.fail primitive<a href="#1-background-the-copyfail-primitive" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The full mechanics are covered in the xint.io writeup, and IMO the exploit is very elegant. The short version:</p>
+<p>Linux exposes kernel crypto to unprivileged userspace via AF_ALG sockets. A 2017 &ldquo;in-place optimization&rdquo; allowed the AEAD encryption engine to use the destination buffer as scratch space during intermediate steps — a reasonable choice, unless that destination buffer is backed by page cache pages.</p>
+<p>The exploit feeds file data into an encryption operation using <code>splice()</code>, which passes page-cache pages directly rather than copying them. The AEAD engine writes a small amount of attacker-controlled data into those pages as scratch. The file on disk is untouched. The kernel&rsquo;s in-memory view of it changes. No filesystem permissions are checked; no root is required; any process that can open an AF_ALG socket and read a file can do this.</p>
+<hr>
+<h2 id="2-why-the-page-cache-crosses-container-boundaries">2. Why the page cache crosses container boundaries<a href="#2-why-the-page-cache-crosses-container-boundaries" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The Linux page cache is the kernel&rsquo;s in-memory cache of file contents. When a process reads a file, the kernel loads it into the page cache and serves future reads from there. Writes to the page cache via <em>copy.fail</em> are immediately visible to any other process reading the same file — regardless of which container that process is in.</p>
+<p>Linux namespaces isolate process trees, network interfaces, mount points, and user IDs. The page cache has no namespace. There is no per-container view of cached file contents. Every container on a node shares one page cache, managed by one kernel.</p>
+<p>Container images are composed of layers. containerd stores each unique layer once on disk; multiple containers that share a base image mount the same underlying inodes through overlayfs. Shared inodes mean shared page cache pages. If two containers on the same node have pulled images that share a layer, any file in that layer lives in memory exactly once, visible to both.</p>
+<hr>
+<h2 id="3-the-talos-escape-chain">3. The Talos escape chain<a href="#3-the-talos-escape-chain" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p><a href="https://www.talos.dev/">Talos Linux</a> is built around the claim that &ldquo;Talos Linux is the best OS for Kubernetes&rdquo;. It ships with security-focused design: no SSH daemon, no package manager, no operator shell, a read-only root filesystem, and a gRPC-only management plane. Unfortunately all of that hardening operates at the OS level — and copy.fail operates below it, at the kernel. The Talos security team documented the vector in advisory <a href="https://github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx">GHSA-m38g-vww2-mvgx</a> and patched it in v1.12.7 and v1.13.0, which ship the updated Linux kernel.</p>
+<p>The escape has four components:</p>
+<p><strong>Shared layer with a privileged trigger.</strong> kube-proxy runs as root on every Talos node, and its image shares a layer containing <code>/usr/sbin/nft</code> with images built on compatible base distributions. kube-proxy calls <code>nft</code> automatically every few seconds to reconcile nftables rules with the cluster&rsquo;s Service objects.</p>
+<p><strong>The exploit loop.</strong> The attacker&rsquo;s process — running as an unprivileged user with no capabilities — opens an AF_ALG socket, reads the <code>nft</code> binary&rsquo;s file descriptor, and splices its pages into an AEAD encryption operation. Each call writes four bytes of shellcode into the page-cache image of <code>nft</code> at a chosen offset. After enough iterations to cover the payload, the entire in-memory binary has been replaced. The disk binary is untouched.</p>
+<p><strong>Automatic execution.</strong> kube-proxy&rsquo;s next reconciliation tick — within five seconds — causes the kernel to exec what it believes is <code>nft</code>. It is the attacker&rsquo;s shellcode, running as root inside a privileged pod.</p>
+<p><strong>Host filesystem access.</strong> kube-proxy runs with <code>privileged: true</code>, which grants <code>CAP_SYS_ADMIN</code> and access to host block devices. The shellcode can mount the host root filesystem and read or modify anything on it — kubeconfig credentials, certificates, Talos configuration, etcd data. Full node compromise.</p>
+<p><em>Architecture: attacker pod and kube-proxy share the same page-cache pages through a common overlayfs layer, giving the attacker write access to memory that kube-proxy will execute.</em></p>
+<pre class="mermaid">graph TB
+    subgraph node["Talos Node"]
+        subgraph ap["Attacker Pod<br/>unprivileged · no capabilities<br/><br/>Runs copy.fail exploit to replace nft in-memory with shellcode"]
+        end
+
+        subgraph kp["kube-proxy<br/>root · privileged: true · hostNetwork: true<br/><br/>Runs nft on schedule and executes shellcode"]
+        end
+
+        subgraph layer["Shared overlayfs lower layer"]
+            nft["/usr/sbin/nft · same inode"]
+        end
+
+        subgraph kern["Linux Kernel"]
+            pc["Page Cache<br/>nft inode · same RAM"]
+        end
+
+        hfs["Host Filesystem<br/>kubeconfig · certs · Talos config<br/><br/>Accessible via block device mount"]
+
+        ap ~~~ kp
+        ap --- layer
+        kp --- layer
+        layer --- pc
+        kp --- hfs
+    end
+</pre><p><em>Attack sequence: the exploit loop overwrites <code>nft</code>&rsquo;s page-cache pages 4 bytes at a time; kube-proxy&rsquo;s next scheduled execution runs the shellcode and gains access to the host filesystem.</em></p>
+<pre class="mermaid">sequenceDiagram
+    participant A as Attacker pod<br/>(unprivileged)
+    participant OL as overlayfs<br/>lower layer
+    participant PC as Page Cache<br/>(nft inode)
+    participant KP as kube-proxy pod<br/>(root · privileged)
+    participant H as Host Filesystem
+
+    A->>OL: open("/usr/sbin/nft", O_RDONLY)
+    OL-->>A: fd → shared lower-layer inode
+
+    loop payload: 4 bytes at offset i
+        A->>PC: socket(AF_ALG) + splice(fd→pipe→ALG)
+        Note over PC: authencesn scratch write<br/>payload[i:i+4] → page cache[i:i+4]
+    end
+
+    Note over A: page cache poisoned<br/>disk binary untouched
+
+    Note over KP: ~5 seconds later<br/>(scheduled)
+    KP->>PC: exec("/usr/sbin/nft")
+    PC-->>KP: serves shellcode<br/>(not real nft binary)
+
+    Note over KP: shellcode runs as root<br/>inside privileged pod
+    KP->>H: mount /dev/{host root} → /mnt/host
+    KP->>H: read/write host filesystem<br/>(kubeconfig, certs, Talos config)
+</pre><hr>
+<h2 id="4-could-this-happen-in-other-clusters">4. Could this happen in other clusters?<a href="#4-could-this-happen-in-other-clusters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The Talos chain requires layer overlap between the attacker&rsquo;s container and a privileged process. In a production cluster where the attacker finds themselves in a pod they didn&rsquo;t build, that overlap is not guaranteed — but the surface is larger than it looks.</p>
+<p><strong>Shared base images.</strong> Most organizations build both application containers and cluster infrastructure (DaemonSets, agents, operators) from a small number of internal base images, often the same one, to standardize patching cadence. That creates the layer overlap this attack needs.</p>
+<p><strong>CNI plugins.</strong> Cilium, Calico, Flannel, and Weave run as privileged DaemonSets on every node with CAP_NET_ADMIN or CAP_SYS_ADMIN. They ship binaries — eBPF loaders, nftables wrappers, VXLAN tools — that may appear in a shared layer if the attacker&rsquo;s image is based on a compatible distribution.</p>
+<p><strong>Monitoring and logging agents.</strong> Prometheus node_exporter, Datadog agents, Falco, Fluent-d — all privileged DaemonSets, all touching the filesystem on a schedule. A monitoring agent that calls a shell or a compression tool from a shared layer on a periodic schedule is structurally identical to the kube-proxy/nft pattern.</p>
+<p><strong>CSI drivers.</strong> AWS, GCP, and Azure CSI storage drivers are privileged DaemonSets that invoke <code>mount</code>, <code>resize2fs</code>, and related tools regularly.</p>
+<p><strong>Setuid binaries as deferred triggers.</strong> Even without a continuously-running privileged process as a trigger, a setuid binary in a shared layer is exploitable when a pod restart or rolling deployment causes a privileged init container to exec it. Kubernetes restarts pods constantly.</p>
+<p><strong>The attacker&rsquo;s recon.</strong> From inside a container, <code>/proc/*/exe</code> symlinks and inode comparisons reveal which binaries are being executed by other processes and whether the attacker shares page-cache pages with them. The recon is cheap and requires no special permissions.</p>
+<p>The overlap requirement makes this harder than a pure LPE. In a cluster with strict image provenance — application images and system DaemonSets built from entirely separate supply chains — the overlap may genuinely not exist. But clusters tend toward sprawl, and the surface grows with every additional agent and plugin.</p>
+<p>I&rsquo;m curious which of these vectors the xint.io team will cover in their part 2 — or whether they&rsquo;ll use a completely different approach. We&rsquo;ll see how this plays out.</p>
+<hr>
+<h2 id="5-the-shared-kernel-problem-and-what-to-do-about-it">5. The shared kernel problem and what to do about it<a href="#5-the-shared-kernel-problem-and-what-to-do-about-it" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The container boundary is a namespace boundary, not a kernel boundary. Every piece of OS hardening — Talos&rsquo;s read-only root, absent shell, gRPC-only management — operates above the kernel. <em>copy.fail</em> operates at the kernel. This is not specific to Talos: any shared-kernel container OS is subject to the same class of attack. Patching <em>copy.fail</em> addresses this specific CVE; the architectural question is what prevents the next one.</p>
+<p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
+<p><strong>Sandboxed runtimes (<a href="https://gvisor.dev/">gVisor</a>).</strong> gVisor&rsquo;s <code>runsc</code> runtime intercepts all syscalls in a userspace kernel called the Sentry, which implements the Linux syscall surface without delegating to the host kernel. An AF_ALG socket call from inside a gVisor container is handled entirely by the Sentry — the host kernel&rsquo;s <code>algif_aead.c</code> is never invoked. The copy.fail primitive does not exist from inside a gVisor container. gVisor is used in production at Google and is available as a node pool option in GKE.</p>
+<p>Both approaches trade some performance or compatibility for a structural guarantee that kernel CVEs in one workload cannot reach other workloads — something no amount of OS hardening on a shared-kernel architecture can provide.</p>
+<table>
+  <thead>
+      <tr>
+          <th>Approach</th>
+          <th>Kernel shared?</th>
+          <th>copy.fail reachable?</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>Talos Linux (hardened)</td>
+          <td>Yes</td>
+          <td>Yes</td>
+      </tr>
+      <tr>
+          <td>Ubuntu + AppArmor/seccomp</td>
+          <td>Yes</td>
+          <td>Yes</td>
+      </tr>
+      <tr>
+          <td>Firecracker MicroVM</td>
+          <td>No (per-VM kernel)</td>
+          <td>No</td>
+      </tr>
+      <tr>
+          <td>gVisor (runsc)</td>
+          <td>No (syscall interception)</td>
+          <td>No</td>
+      </tr>
+  </tbody>
+</table>
+<hr>
+<h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<ul>
+<li>copy.fail vulnerability site: <a href="https://copy.fail">copy.fail</a></li>
+<li>xint.io LPE writeup (part 1): <a href="https://xint.io/blog/copy-fail-linux-distributions">xint.io/blog/copy-fail-linux-distributions</a></li>
+<li>Talos security advisory: <a href="https://github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx">github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx</a></li>
+<li>Firecracker microVM: <a href="https://firecracker-microvm.github.io/">firecracker-microvm.github.io</a></li>
+<li>gVisor sandboxed runtime: <a href="https://gvisor.dev/">gvisor.dev</a></li>
+</ul>
+]]></content>
+		</item>
 		
 		<item>
 			<title>KV Cache Flood: DoS Against Multi-Tenant LLMs</title>
