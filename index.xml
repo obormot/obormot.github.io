@@ -22,7 +22,7 @@
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p><em>copy.fail</em> is a local privilege escalation — but the xint.io authors note it can also be used to escape Kubernetes pods. How? Containers on the same node share the host kernel, and through it, the page cache: the kernel&rsquo;s in-memory representation of file contents. <em>copy.fail</em> lets an unprivileged process corrupt those pages. If two containers share an image layer, they share page-cache pages for every file in it. Corrupt the right file in a layer shared with a privileged container, and you get code execution in that container&rsquo;s context.</p>
+<p><em>copy.fail</em> is a local privilege escalation — but the xint.io authors note it can also be used to escape Kubernetes pods. In that scenario, the LPE itself is not the point: the attacker is already running in a pod and doesn&rsquo;t need to escalate within it. Instead, <em>copy.fail</em> is used as a page cache corruption primitive. Containers on the same node share the host kernel, and through it, the page cache: the kernel&rsquo;s in-memory representation of file contents. If two containers share an image layer, they share page-cache pages for every file in it. Corrupt the right file in a layer shared with a privileged container, and you get code execution in that container&rsquo;s context — no LPE in the attacker&rsquo;s pod required.</p>
 <p>Talos Linux — a minimal, immutable OS for Kubernetes with no shell, no SSH, and a read-only root filesystem — is a concrete example where this plays out. On Talos worker nodes, kube-proxy and user workload containers share an overlayfs layer containing <code>/usr/sbin/nft</code>. kube-proxy calls <code>nft</code> as root every few seconds to reconcile nftables rules. An attacker in an unprivileged pod overwrites <code>nft</code>&rsquo;s page-cache pages with shellcode and waits. The next reconciliation tick executes it as root, with access to the host filesystem.</p>
 <p>At the end I discuss how microVM and sandboxed runtime architectures address this class of vulnerability by construction.</p>
 <hr>
@@ -50,7 +50,7 @@
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
 <p><a href="https://www.talos.dev/">Talos Linux</a> is built around the claim that &ldquo;Talos Linux is the best OS for Kubernetes&rdquo;. It ships with security-focused design: no SSH daemon, no package manager, no operator shell, a read-only root filesystem, and a gRPC-only management plane. Unfortunately all of that hardening operates at the OS level — and copy.fail operates below it, at the kernel. The Talos security team documented the vector in advisory <a href="https://github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx">GHSA-m38g-vww2-mvgx</a> and patched it in v1.12.7 and v1.13.0, which ship the updated Linux kernel.</p>
-<p>How the attack works in killchain terms: initial access to an unprivileged pod → <em>copy.fail</em> LPE within that pod → lateral movement into a privileged pod via shared page cache → container escape to the host. The escape has four components:</p>
+<p>How the attack works in killchain terms: initial access to an unprivileged pod → page cache corruption via <em>copy.fail</em> → hijack code execution in a privileged pod via shared layer → container escape to the host. The escape has four components:</p>
 <p><strong>Shared layer with a privileged trigger.</strong> kube-proxy runs as root on every Talos node, and its image shares a layer containing <code>/usr/sbin/nft</code> with images built on compatible base distributions. kube-proxy calls <code>nft</code> automatically every few seconds to reconcile nftables rules with the cluster&rsquo;s Service objects.</p>
 <p><strong>The exploit loop.</strong> The attacker&rsquo;s process — running as an unprivileged user with no capabilities — opens an AF_ALG socket, reads the <code>nft</code> binary&rsquo;s file descriptor, and splices its pages into an AEAD encryption operation. Each call writes four bytes of shellcode into the page-cache image of <code>nft</code> at a chosen offset. After enough iterations to cover the payload, the entire in-memory binary has been replaced. The disk binary is untouched.</p>
 <p><strong>Automatic execution.</strong> kube-proxy&rsquo;s next reconciliation tick — within five seconds — causes the kernel to exec what it believes is <code>nft</code>. It is the attacker&rsquo;s shellcode, running as root inside a privileged pod.</p>
@@ -127,37 +127,60 @@
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
 <p>The container boundary is a namespace boundary, not a kernel boundary. Every piece of OS hardening — Talos&rsquo;s read-only root, absent shell, gRPC-only management — operates above the kernel. <em>copy.fail</em> operates at the kernel. This is not specific to Talos: any shared-kernel container OS is subject to the same class of attack. Patching <em>copy.fail</em> addresses this specific CVE; the architectural question is what prevents the next one.</p>
-<p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
 <p><strong>Sandboxed runtimes (<a href="https://gvisor.dev/">gVisor</a>).</strong> gVisor&rsquo;s <code>runsc</code> runtime intercepts all syscalls in a userspace kernel called the Sentry, which implements the Linux syscall surface without delegating to the host kernel. An AF_ALG socket call from inside a gVisor container is handled entirely by the Sentry — the host kernel&rsquo;s <code>algif_aead.c</code> is never invoked. The copy.fail primitive does not exist from inside a gVisor container. gVisor is used in production at Google and is available as a node pool option in GKE.</p>
+<p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
 <p>Both approaches trade some performance or compatibility for a structural guarantee that kernel CVEs in one workload cannot reach other workloads — something no amount of OS hardening on a shared-kernel architecture can provide.</p>
 <table>
   <thead>
       <tr>
-          <th>Approach</th>
-          <th>Kernel shared?</th>
-          <th>copy.fail reachable?</th>
+          <th></th>
+          <th>Container</th>
+          <th>gVisor</th>
+          <th>Firecracker</th>
       </tr>
   </thead>
   <tbody>
       <tr>
-          <td>Talos Linux (hardened)</td>
+          <td>Kernel shared</td>
           <td>Yes</td>
-          <td>Yes</td>
-      </tr>
-      <tr>
-          <td>Ubuntu + AppArmor/seccomp</td>
-          <td>Yes</td>
-          <td>Yes</td>
-      </tr>
-      <tr>
-          <td>Firecracker MicroVM</td>
-          <td>No (per-VM kernel)</td>
+          <td>No</td>
           <td>No</td>
       </tr>
       <tr>
-          <td>gVisor (runsc)</td>
-          <td>No (syscall interception)</td>
+          <td><em>copy.fail</em> reachable</td>
+          <td>Yes</td>
           <td>No</td>
+          <td>No</td>
+      </tr>
+      <tr>
+          <td>Boundary type</td>
+          <td>Software (seccomp)</td>
+          <td>Software (Sentry)</td>
+          <td>Hardware (KVM)</td>
+      </tr>
+      <tr>
+          <td>Host attack surface</td>
+          <td>Large</td>
+          <td>~50 syscalls</td>
+          <td>KVM + minimal VMM</td>
+      </tr>
+      <tr>
+          <td>Guest kernel</td>
+          <td>Shared host</td>
+          <td>Sentry (userspace)</td>
+          <td>Vendor-built, stripped</td>
+      </tr>
+      <tr>
+          <td>Memory overhead</td>
+          <td>~MB</td>
+          <td>~15 MB</td>
+          <td>~125 MB</td>
+      </tr>
+      <tr>
+          <td>Syscall compat</td>
+          <td>Full</td>
+          <td>Partial</td>
+          <td>Full</td>
       </tr>
   </tbody>
 </table>
@@ -170,9 +193,9 @@
 <ul>
 <li>copy.fail vulnerability site: <a href="https://copy.fail">copy.fail</a></li>
 <li>xint.io LPE writeup (part 1): <a href="https://xint.io/blog/copy-fail-linux-distributions">xint.io/blog/copy-fail-linux-distributions</a></li>
-<li>Talos security advisory: <a href="https://github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx">github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx</a></li>
-<li>Firecracker microVM: <a href="https://firecracker-microvm.github.io/">firecracker-microvm.github.io</a></li>
+<li>Talos security advisory: <a href="https://github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx">GHSA-m38g-vww2-mvgx</a></li>
 <li>gVisor sandboxed runtime: <a href="https://gvisor.dev/">gvisor.dev</a></li>
+<li>Firecracker microVM: <a href="https://firecracker-microvm.github.io/">firecracker-microvm.github.io</a></li>
 </ul>
 ]]></content>
 		</item>
