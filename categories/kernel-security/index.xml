@@ -106,7 +106,7 @@
     KP->>H: mount /dev/{host root} → /mnt/host
     KP->>H: read/write host filesystem<br/>(kubeconfig, certs, Talos config)
 </pre><hr>
-<h2 id="4-could-this-happen-in-other-clusters">4. Could this happen in other clusters?<a href="#4-could-this-happen-in-other-clusters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="4-attack-surface-in-production-clusters">4. Attack surface in production clusters<a href="#4-attack-surface-in-production-clusters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -114,12 +114,15 @@
 <p>The Talos chain requires layer overlap between the attacker&rsquo;s container and a privileged process. In a production cluster where the attacker finds themselves in a pod they didn&rsquo;t build, that overlap is not guaranteed — but the surface is larger than it looks.</p>
 <p><strong>Shared base images.</strong> Most organizations build both application containers and cluster infrastructure (DaemonSets, agents, operators) from a small number of internal base images, often the same one, to standardize patching cadence. That creates the layer overlap this attack needs.</p>
 <p><strong>CNI plugins.</strong> Cilium, Calico, Flannel, and Weave run as privileged DaemonSets on every node with CAP_NET_ADMIN or CAP_SYS_ADMIN. They ship binaries — eBPF loaders, nftables wrappers, VXLAN tools — that may appear in a shared layer if the attacker&rsquo;s image is based on a compatible distribution.</p>
-<p><strong>Monitoring and logging agents.</strong> Prometheus node_exporter, Datadog agents, Falco, Fluent-d — all privileged DaemonSets, all touching the filesystem on a schedule. A monitoring agent that calls a shell or a compression tool from a shared layer on a periodic schedule is structurally identical to the kube-proxy/nft pattern. <strong>There is an irony here</strong>: a workload running with no added capabilities and a distroless image is a poor target for this attack. The security agents deployed to watch it are better targets — always present and privileged by definition. The tooling added to monitor for anomalies itself becomes the attack surface.</p>
+<p><strong>Monitoring and logging agents.</strong> Prometheus node_exporter, Datadog agents, Falco, Fluent-d — all privileged DaemonSets, all touching the filesystem on a schedule. A monitoring agent that calls a shell or a compression tool from a shared layer on a periodic schedule is structurally identical to the kube-proxy/nft pattern.</p>
+<blockquote>
+<p><strong>There is an irony here</strong>: a workload running with no added capabilities and a distroless image is a poor target for this attack. The security agents deployed to watch it are better targets — always present and privileged by definition. The tooling added to monitor for anomalies itself becomes the attack surface.</p>
+</blockquote>
 <p><strong>CSI drivers.</strong> AWS, GCP, and Azure CSI storage drivers are privileged DaemonSets that invoke <code>mount</code>, <code>resize2fs</code>, and related tools regularly.</p>
 <p><strong>Setuid binaries as deferred triggers.</strong> Even without a continuously-running privileged process as a trigger, a setuid binary in a shared layer is exploitable when a pod restart or rolling deployment causes a privileged init container to exec it. Kubernetes restarts pods constantly.</p>
 <p><strong>The attacker&rsquo;s recon.</strong> From inside a container, <code>/proc/*/exe</code> symlinks and inode comparisons reveal which binaries are being executed by other processes and whether the attacker shares page-cache pages with them. The recon is cheap and requires no special permissions.</p>
 <p>The overlap requirement makes this harder than a pure LPE. In a cluster with strict image provenance — application images and system DaemonSets built from entirely separate supply chains — the overlap may genuinely not exist. But clusters tend toward sprawl, and the surface grows with every additional agent and plugin.</p>
-<p>I&rsquo;m curious which of these vectors the xint.io team will cover in their part 2 — or whether they&rsquo;ll use a completely different approach. We&rsquo;ll see how this plays out.</p>
+<p>I&rsquo;m curious which of these vectors the xint.io team will cover in their part 2 — or whether they&rsquo;ll use a completely different approach.</p>
 <hr>
 <h2 id="5-the-shared-kernel-problem-and-what-to-do-about-it">5. The shared kernel problem and what to do about it<a href="#5-the-shared-kernel-problem-and-what-to-do-about-it" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
@@ -127,6 +130,7 @@
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
 <p>The container boundary is a namespace boundary, not a kernel boundary. Every piece of OS hardening — Talos&rsquo;s read-only root, absent shell, gRPC-only management — operates above the kernel. <em>copy.fail</em> operates at the kernel. This is not specific to Talos: any shared-kernel container OS is subject to the same class of attack. Patching <em>copy.fail</em> addresses this specific CVE; the architectural question is what prevents the next one.</p>
+<p>This vulnerability class has a ten-year track record. <strong>DirtyCow</strong> (CVE-2016-0728) exploited a race condition in copy-on-write handling to corrupt page cache pages and write to read-only files — container escapes followed. <strong>DirtyPipe</strong> (CVE-2022-0847) exploited a pipe buffer flag bug to achieve the same page cache write primitive; Replit <a href="https://blog.replit.com/dirtypipe-kernel-vulnerability">documented</a> how modifications were immediately visible across all containers on the same host, even with unprivileged containers and hardening in place. <em><strong>copy.fail</strong></em> (2026) uses the AEAD in-place optimization. Three separate bugs, a decade apart, all exploiting the same architectural property: the page cache has no tenant boundary. Each time, the kernel was patched. No structural change followed. So what solutions emerged to actually address this class of vulnerability?</p>
 <p><strong>Sandboxed runtimes (<a href="https://gvisor.dev/">gVisor</a>).</strong> gVisor&rsquo;s <code>runsc</code> runtime intercepts all syscalls in a userspace kernel called the Sentry, which implements the Linux syscall surface without delegating to the host kernel. An AF_ALG socket call from inside a gVisor container is handled entirely by the Sentry — the host kernel&rsquo;s <code>algif_aead.c</code> is never invoked. The copy.fail primitive does not exist from inside a gVisor container. gVisor is used in production at Google and is available as a node pool option in GKE.</p>
 <p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
 <p>Both approaches trade some performance or compatibility for a structural guarantee that kernel CVEs in one workload cannot reach other workloads — something no amount of OS hardening on a shared-kernel architecture can provide.</p>
@@ -191,9 +195,11 @@
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
 <ul>
-<li>copy.fail vulnerability site: <a href="https://copy.fail">copy.fail</a></li>
+<li>copy.fail vulnerability: <a href="https://copy.fail">copy.fail</a></li>
 <li>xint.io LPE writeup (part 1): <a href="https://xint.io/blog/copy-fail-linux-distributions">xint.io/blog/copy-fail-linux-distributions</a></li>
 <li>Talos security advisory: <a href="https://github.com/siderolabs/talos/security/advisories/GHSA-m38g-vww2-mvgx">GHSA-m38g-vww2-mvgx</a></li>
+<li>DirtyPipe cross-container contamination by Replit: <a href="https://blog.replit.com/dirtypipe-kernel-vulnerability">blog.replit.com/dirtypipe-kernel-vulnerability</a></li>
+<li>DirtyCow (CVE-2016-0728): <a href="https://dirtycow.ninja/">dirtycow.ninja</a></li>
 <li>gVisor sandboxed runtime: <a href="https://gvisor.dev/">gvisor.dev</a></li>
 <li>Firecracker microVM: <a href="https://firecracker-microvm.github.io/">firecracker-microvm.github.io</a></li>
 </ul>
