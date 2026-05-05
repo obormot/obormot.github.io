@@ -3,10 +3,19 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://obormot.github.io/</loc>
-    <lastmod>2026-05-02T11:58:11-07:00</lastmod>
+    <lastmod>2026-05-05T00:00:00-07:00</lastmod>
   </url><url>
     <loc>https://obormot.github.io/categories/</loc>
-    <lastmod>2026-05-02T11:58:11-07:00</lastmod>
+    <lastmod>2026-05-05T00:00:00-07:00</lastmod>
+  </url><url>
+    <loc>https://obormot.github.io/posts/my-product-security-principles/</loc>
+    <lastmod>2026-05-05T00:00:00-07:00</lastmod>
+  </url><url>
+    <loc>https://obormot.github.io/posts/</loc>
+    <lastmod>2026-05-05T00:00:00-07:00</lastmod>
+  </url><url>
+    <loc>https://obormot.github.io/categories/product-security/</loc>
+    <lastmod>2026-05-05T00:00:00-07:00</lastmod>
   </url><url>
     <loc>https://obormot.github.io/categories/container-security/</loc>
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
@@ -15,9 +24,6 @@
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
   </url><url>
     <loc>https://obormot.github.io/categories/kernel-security/</loc>
-    <lastmod>2026-05-02T11:58:11-07:00</lastmod>
-  </url><url>
-    <loc>https://obormot.github.io/posts/</loc>
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
   </url><url>
     <loc>https://obormot.github.io/categories/research/</loc>

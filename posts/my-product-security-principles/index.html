@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q8CM1FPSY9"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-Q8CM1FPSY9');
+        }
+      </script><meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1, minimal-ui">
+<meta http-equiv="X-UA-Compatible" content="ie=edge"><meta name="robots" content="index, follow"><meta name="author" content="">
+<meta name="description" content=""><link rel="manifest" href="/site.webmanifest"><link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="brain overflow" />
+<meta name="theme-color" content="#494f5c">
+<meta name="msapplication-TileColor" content="#494f5c">
+
+  <meta itemprop="name" content="My Product Security Principles">
+  <meta itemprop="description" content="In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?
+What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.">
+  <meta itemprop="datePublished" content="2026-05-05T00:00:00-07:00">
+  <meta itemprop="dateModified" content="2026-05-05T00:00:00-07:00">
+  <meta itemprop="wordCount" content="1374">
+  <meta itemprop="keywords" content="Product Security"><meta property="og:url" content="https://obormot.github.io/posts/my-product-security-principles/">
+  <meta property="og:site_name" content="brain overflow">
+  <meta property="og:title" content="My Product Security Principles">
+  <meta property="og:description" content="In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?
+What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-05-05T00:00:00-07:00">
+    <meta property="article:modified_time" content="2026-05-05T00:00:00-07:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="My Product Security Principles">
+  <meta name="twitter:description" content="In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?
+What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.">
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "My Product Security Principles",
+    "name": "My Product Security Principles",
+    "description": "In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?\nWhat follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.\n",
+    "keywords": [],
+    "articleBody": "In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?\nWhat follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.\n1. Risk is the unit of work, not findings Everything flows from business risk. Vulnerabilities, architecture gaps, compliance requirements — they’re all risks to be scored, prioritized, and decided on, and they belong in a risk register that the business actually owns — and part of the security team’s job is ensuring it does. Not a document security maintains in isolation, but a living record that business owners understand, contribute to, and sign off on.\nProactive and continuous risk reduction is how I formulate the security team’s mission.\n2. Frame risk in business terms A CVSS score means nothing to an executive. A risk item must answer: what’s the realistic scenario, what does it cost if it happens, what does it cost to fix, what’s your recommendation? Security decisions are business decisions — they belong at the executive level, framed in business language.\nFor the highest-stakes decisions — security exceptions, risks above a materiality threshold — get explicit executive sign-off. It moves accountability to where the decision lives.\nRisk = Severity × Potential Impact — the key formula that turns a vulnerability into a business decision.\n3. Security Architecture A whiteboard conversation at design time costs an hour. A redesign after implementation costs a sprint. Security belongs at the beginning of the design process, not at the end as a gate. The goal is to be the person engineers call when they’re designing, not when they’re shipping.\nDon’t overthink threat modeling. Formal frameworks have their place, but if the overhead of the methodology is slowing teams down, drop it. A napkin sketch of trust boundaries and a list of “what could go wrong” is a threat model. An imperfect one done at design time beats a rigorous one that never happens.\nGood security architecture is transparent. Document it publicly — it builds trust, and it’s the right counterweight to security through obscurity. If the design is sound, exposure doesn’t weaken it. If your code ever leaks, there should be no secrets in it worth finding.\n4. Assume controls fail — design and test for it The operating posture is proactive, not reactive — find the gaps before an attacker or a customer does. No single control holds forever. The question after every architectural decision is: when this fails, what’s the worst reachable outcome? Isolation, least privilege, and short-lived credentials aren’t redundancy — they’re blast radius reduction. Treat defense in depth as a system property.\nDesigning for failure isn’t enough — validate that your controls actually perform as designed. Security audits, red and purple team exercises, and bug bounty program all serve the same function: actively probing your own assumptions.\n5. Friction is the enemy Culture is a big one. Most engineers want to build secure software — they’re just operating under deadlines, competing priorities, and finite cognitive bandwidth. When security loses, it’s usually not because engineers don’t care; it’s because the secure path was harder than it needed to be, or they simply didn’t know what it was. Security expertise isn’t a given — engineers are experts in their domain, not ours.\nEvery process, template, and gate should make the secure choice the default, not the tax. Security has to live inside the workflows engineers already use — a separate system they have to visit is a system that will fail adoption. Friction reduction is the mechanism; the goal is cultural — security becoming a natural part of how the team ships.\n6. Influence over formal authority Security teams often have no direct power over engineering decisions. Authority comes from technical credibility, consistent judgment, and being right often enough that people seek your input. A security control engineers chose is worth more than one you mandated.\nInfluence runs in both directions. Top-down: executive sponsorship sets the tone and makes security non-negotiable at the policy level. Bottom-up: invest in building relationships with engineering teams — understand their roadmaps, empathize with their pressures — that’s where actual adoption happens.\n7. Partners, not adversaries Competing with engineering for resources — security work versus features on the roadmap — comes with the territory. That tension is structural and it never fully goes away. Recognizing it as part of the job is healthy; letting it harden into an us-versus-them mentality is not. Security and engineering look at the same problems from different angles, but there is one goal: ship secure software. Learn each other’s stack, understand the roadmap, show up as a collaborator rather than a reviewer. The security team engineers want to call is more effective than the one they’re required to consult.\n8. Know when to stand down — and when to push back The willingness to say “network-layer isolation is sufficient here” or “this threat is acceptable risk” is what earns credibility for the fights that matter. Security maximalism destroys trust; knowing when to stand down builds it.\nWhen you do push back, come with data — exploit likelihood, realistic impact, cost to fix. And maximize the context you hand to developers: a finding with a clear severity rationale, a realistic attack scenario, and a suggested remediation gets acted on. A bare vulnerability ID with no explanation gets triaged into a backlog and forgotten. The goal isn’t to be right — it’s to be useful.\n9. Disagree and commit — deliberately Sometimes a feature ships with known security gaps. That’s a business decision, and it’s often the right one. The security team’s job in that moment isn’t to block or to silently acquiesce — it’s to make the decision deliberate: agree on the minimal security bar, add basic compensating controls, document the residual risk, and put the remediation work on the roadmap. Ship it, then follow through. The danger isn’t shipping with known gaps — it’s shipping with undocumented gaps and no agreed plan to close them.\n10. Scale through systems, not headcount A small security team can’t review everything a hundred engineers build. Security scales through parallel tracks:\nEnablement: templates, reference architectures, security champions, and training that make good security judgment transferable — so engineers make secure decisions without needing a security review at every turn.\nAutomation: SAST, dependency scanning, secrets detection, security gates in CI/CD that run on every PR, and most recently, LLMs.\nHolistic remediation: when a vulnerability pattern surfaces in a functional area, drive an initiative to close the class — a shared library, a framework guardrail, a linting rule. Closing the class beats closing the tickets.\n11. Security success is invisible — until it is a failure Security’s value is counterfactual by design. You’re selling the absence of bad outcomes, which is invisible until it isn’t. The “we didn’t get hacked — why do we even need a security team?” question is a predictable trap. When things are quiet, there’s nothing visible to point to; when something goes wrong, the case for security makes itself — but at too high a cost.\nThe measurement gap is real — work around it. SLA compliance, MTTR, vulnerability age, findings caught pre-production are useful signals, but proxies for value, not proof of it. Tell the risk reduction story proactively: here’s what we found before it became a breach, here’s how the attack surface changed over the past year, here’s what we closed before a researcher or an attacker got there first.\nSecurity that only shows up in the numbers after an incident has already lost the framing war — and ironically, that’s often when companies make their first Product Security hire.\nDone well, product security is invisible: engineers ship without friction, teams collaborate without tension, and executives make informed decisions without needing a crisis to focus them. Getting there is a journey — but not an impossible one.\n",
+    "wordCount" : "1374",
+    "inLanguage": "en",
+    "datePublished": "2026-05-05T00:00:00-07:00",
+    "dateModified": "2026-05-05T00:00:00-07:00",
+    "author":{
+        "@type": "Person",
+        "name":  null ,},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://obormot.github.io/posts/my-product-security-principles/"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "brain overflow",
+      "description": "",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://obormot.github.io/favicon.ico"
+      }
+    }
+}
+</script><title>My Product Security Principles</title><link rel="stylesheet dns-prefetch preconnect preload prefetch" as="style" media="screen" href="https://obormot.github.io/css/style.min.c1c763c6719166bd01d9de6877d8e24da94df47680465859953ad0da71d015f0.css" integrity="sha256-wcdjxnGRZr0B2d5od9jiTalN9HaARlhZlTrQ2nHQFfA=" crossorigin="anonymous">
+	</head>
+
+<body id="page">
+<header id="site-header">
+	<div class="hdr-wrapper section-inner">
+		<div class="hdr-left">
+			<div class="site-branding">
+				<a href="https://obormot.github.io/">brain overflow</a>
+			</div>
+			<nav class="site-nav hide-in-mobile"><a href="https://obormot.github.io/posts/">posts</a><a href="https://obormot.github.io/about/">about</a><a href="https://obormot.github.io/cv/">my CV</a></nav>
+		</div>
+		<div class="hdr-right hdr-icons">
+			<span class="hdr-links hide-in-mobile"><a href="https://www.linkedin.com/in/oskaribatullin" target="_blank" rel="noopener me" title="Linkedin"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a><a href="https://github.com/obormot" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path
+      d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+   </path>
+</svg></a></span><button id="share-btn" class="hdr-btn" title=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share-2">
+      <circle cx="18" cy="5" r="3"></circle>
+      <circle cx="6" cy="12" r="3"></circle>
+      <circle cx="18" cy="19" r="3"></circle>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+   </svg></button>
+ 
+<div id="share-links" class="animated fast">
+    
+    
+    
+    
+    <ul>
+        <li>
+            <a href="https://twitter.com/intent/tweet?hashtags=hermit2&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fmy-product-security-principles%2f&amp;text=My%20Product%20Security%20Principles" target="_blank" rel="noopener" aria-label="Share on X"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path class="st0" d="m21.3 21.1 -11.4 -18.2h-7.2l11.4 18.2zm-18.6 0 7.2 -6.6m4.2 -5 7.2 -6.6" />
+</svg></a>
+        </li>
+        <li>
+            <a href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fobormot.github.io%2fposts%2fmy-product-security-principles%2f" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.threads.net/intent/post?text=My%20Product%20Security%20Principles&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fmy-product-security-principles%2f" target="_blank" rel="noopener" aria-label="Share on threads"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a14 14 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32l-1.757-1.18c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388q.163.07.321.142c1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69q-.362 0-.739.021c-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221"/></svg></a>
+        </li>
+        <li>
+            <a href="https://bsky.app/intent/compose?text=https%3a%2f%2fobormot.github.io%2fposts%2fmy-product-security-principles%2f" target="_blank" rel="noopener" aria-label="Share on bluesky"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive">
+   <path
+      d="M12,10.899c-0.995,-1.934 -3.704,-5.54 -6.223,-7.318c-2.412,-1.703 -3.333,-1.408 -3.936,-1.136c-0.699,0.316 -0.826,1.388 -0.826,2.019c0,0.631 0.346,5.173 0.572,5.931c0.745,2.504 3.399,3.351 5.842,3.079c0.125,-0.018 0.252,-0.035 0.38,-0.051c-0.126,0.02 -0.252,0.037 -0.38,0.051c-3.581,0.531 -6.761,1.836 -2.59,6.48c4.589,4.75 6.289,-1.019 7.161,-3.944c0.872,2.925 1.877,8.486 7.079,3.944c3.906,-3.944 1.073,-5.949 -2.508,-6.48c-0.128,-0.014 -0.254,-0.031 -0.38,-0.051c0.128,0.016 0.255,0.033 0.38,0.051c2.443,0.272 5.097,-0.574 5.842,-3.079c0.226,-0.758 0.572,-5.3 0.572,-5.931c-0,-0.63 -0.127,-1.703 -0.826,-2.018c-0.603,-0.273 -1.524,-0.568 -3.936,1.135c-2.519,1.778 -5.228,5.384 -6.223,7.318Z" />
+</svg></a>
+        </li>
+        <li>
+            <a href="mailto:?subject=My%20Product%20Security%20Principles&amp;body=https%3a%2f%2fobormot.github.io%2fposts%2fmy-product-security-principles%2f" target="_self" rel="noopener" aria-label="Share on Email"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+   <polyline points="22,6 12,13 2,6"></polyline>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fmy-product-security-principles%2f&amp;source=https%3a%2f%2fobormot.github.io%2f&amp;title=My%20Product%20Security%20Principles&amp;summary=My%20Product%20Security%20Principles%2c%20by%20%3cnil%3e%0a%0a%3cnil%3e%0a" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a>
+        </li>
+        <li>
+            <a href="#" onclick="linkShare(&#34;My Product Security Principles&#34;,&#34;https://obormot.github.io/posts/my-product-security-principles/&#34;,&#34;My Product Security Principles, by \u003cnil\u003e\n\n\u003cnil\u003e\n&#34;); return false;" target="_self" rel="noopener" aria-label="Copy Link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+   </svg></a>
+        </li>
+    </ul>
+</div><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+   </svg></button>
+		</div>
+	</div>
+</header>
+<div id="mobile-menu" class="animated fast">
+	<ul><li><a href="https://obormot.github.io/posts/">posts</a></li><li><a href="https://obormot.github.io/about/">about</a></li><li><a href="https://obormot.github.io/cv/">my CV</a></li></ul>
+</div>
+
+	<main class="site-main section-inner animated fadeIn faster"><article class="thin">
+			<header class="post-header">
+				<div class="post-date"><span>May 5, 2026</span></div>
+				<h1>My Product Security Principles</h1>
+			</header>
+			<div class="post-description">
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+   </svg><span class="category"><a href="https://obormot.github.io/categories/product-security">product security</a></span></p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+   </svg>1374&nbsp  6 Minutes, 14 Seconds</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+   </svg>2026-05-05 00:00 -0700
+</p></div>
+			<hr class="post-end">
+			<div class="content">
+				 <p><em>In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?</em></p>
+<p><em>What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.</em></p>
+<hr>
+<h2 id="1-risk-is-the-unit-of-work-not-findings">1. Risk is the unit of work, not findings<a href="#1-risk-is-the-unit-of-work-not-findings" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Everything flows from business risk. Vulnerabilities, architecture gaps, compliance requirements — they&rsquo;re all risks to be scored, prioritized, and decided on, and they belong in a risk register that the business actually owns — and part of the security team&rsquo;s job is ensuring it does. Not a document security maintains in isolation, but a living record that business owners understand, contribute to, and sign off on.</p>
+<p><strong>Proactive and continuous risk reduction</strong> is how I formulate the security team&rsquo;s mission.</p>
+<h2 id="2-frame-risk-in-business-terms">2. Frame risk in business terms<a href="#2-frame-risk-in-business-terms" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>A CVSS score means nothing to an executive. A risk item must answer: what&rsquo;s the realistic scenario, what does it cost if it happens, what does it cost to fix, what&rsquo;s your recommendation? Security decisions are business decisions — they belong at the executive level, framed in business language.</p>
+<p>For the highest-stakes decisions — security exceptions, risks above a materiality threshold — get explicit executive sign-off. It moves accountability to where the decision lives.</p>
+<p><strong>Risk = Severity × Potential Impact</strong> — the key formula that turns a vulnerability into a business decision.</p>
+<h2 id="3-security-architecture">3. Security Architecture<a href="#3-security-architecture" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>A whiteboard conversation at design time costs an hour. A redesign after implementation costs a sprint. Security belongs at the beginning of the design process, not at the end as a gate. The goal is to be the person engineers call when they&rsquo;re designing, not when they&rsquo;re shipping.</p>
+<p>Don&rsquo;t overthink threat modeling. Formal frameworks have their place, but if the overhead of the methodology is slowing teams down, drop it. A napkin sketch of trust boundaries and a list of &ldquo;what could go wrong&rdquo; is a threat model. An imperfect one done at design time beats a rigorous one that never happens.</p>
+<p>Good security architecture is transparent. Document it publicly — it builds trust, and it&rsquo;s the right counterweight to security through obscurity. If the design is sound, exposure doesn&rsquo;t weaken it. If your code ever leaks, there should be no secrets in it worth finding.</p>
+<h2 id="4-assume-controls-fail--design-and-test-for-it">4. Assume controls fail — design and test for it<a href="#4-assume-controls-fail--design-and-test-for-it" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The operating posture is proactive, not reactive — find the gaps before an attacker or a customer does. No single control holds forever. The question after every architectural decision is: when this fails, what&rsquo;s the worst reachable outcome? Isolation, least privilege, and short-lived credentials aren&rsquo;t redundancy — they&rsquo;re blast radius reduction. Treat defense in depth as a system property.</p>
+<p>Designing for failure isn&rsquo;t enough — validate that your controls actually perform as designed. Security audits, red and purple team exercises, and bug bounty program all serve the same function: actively probing your own assumptions.</p>
+<h2 id="5-friction-is-the-enemy">5. Friction is the enemy<a href="#5-friction-is-the-enemy" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Culture is a big one. Most engineers want to build secure software — they&rsquo;re just operating under deadlines, competing priorities, and finite cognitive bandwidth. When security loses, it&rsquo;s usually not because engineers don&rsquo;t care; it&rsquo;s because the secure path was harder than it needed to be, or they simply didn&rsquo;t know what it was. Security expertise isn&rsquo;t a given — engineers are experts in their domain, not ours.</p>
+<p>Every process, template, and gate should make the secure choice the default, not the tax. Security has to live inside the workflows engineers already use — a separate system they have to visit is a system that will fail adoption. Friction reduction is the mechanism; the goal is cultural — security becoming a natural part of how the team ships.</p>
+<h2 id="6-influence-over-formal-authority">6. Influence over formal authority<a href="#6-influence-over-formal-authority" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Security teams often have no direct power over engineering decisions. Authority comes from technical credibility, consistent judgment, and being right often enough that people seek your input. A security control engineers chose is worth more than one you mandated.</p>
+<p>Influence runs in both directions. Top-down: executive sponsorship sets the tone and makes security non-negotiable at the policy level. Bottom-up: invest in building relationships with engineering teams — understand their roadmaps, empathize with their pressures — that&rsquo;s where actual adoption happens.</p>
+<h2 id="7-partners-not-adversaries">7. Partners, not adversaries<a href="#7-partners-not-adversaries" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Competing with engineering for resources — security work versus features on the roadmap — comes with the territory. That tension is structural and it never fully goes away. Recognizing it as part of the job is healthy; letting it harden into an us-versus-them mentality is not. Security and engineering look at the same problems from different angles, but there is one goal: ship secure software. Learn each other&rsquo;s stack, understand the roadmap, show up as a collaborator rather than a reviewer. The security team engineers want to call is more effective than the one they&rsquo;re required to consult.</p>
+<h2 id="8-know-when-to-stand-down--and-when-to-push-back">8. Know when to stand down — and when to push back<a href="#8-know-when-to-stand-down--and-when-to-push-back" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The willingness to say &ldquo;network-layer isolation is sufficient here&rdquo; or &ldquo;this threat is acceptable risk&rdquo; is what earns credibility for the fights that matter. Security maximalism destroys trust; knowing when to stand down builds it.</p>
+<p>When you do push back, come with data — exploit likelihood, realistic impact, cost to fix. And maximize the context you hand to developers: a finding with a clear severity rationale, a realistic attack scenario, and a suggested remediation gets acted on. A bare vulnerability ID with no explanation gets triaged into a backlog and forgotten. The goal isn&rsquo;t to be right — it&rsquo;s to be useful.</p>
+<h2 id="9-disagree-and-commit--deliberately">9. Disagree and commit — deliberately<a href="#9-disagree-and-commit--deliberately" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Sometimes a feature ships with known security gaps. That&rsquo;s a business decision, and it&rsquo;s often the right one. The security team&rsquo;s job in that moment isn&rsquo;t to block or to silently acquiesce — it&rsquo;s to make the decision deliberate: agree on the minimal security bar, add basic compensating controls, document the residual risk, and put the remediation work on the roadmap. Ship it, then follow through. The danger isn&rsquo;t shipping with known gaps — it&rsquo;s shipping with undocumented gaps and no agreed plan to close them.</p>
+<h2 id="10-scale-through-systems-not-headcount">10. Scale through systems, not headcount<a href="#10-scale-through-systems-not-headcount" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>A small security team can&rsquo;t review everything a hundred engineers build. Security scales through parallel tracks:</p>
+<ol>
+<li>
+<p>Enablement: templates, reference architectures, security champions, and training that make good security judgment transferable — so engineers make secure decisions without needing a security review at every turn.</p>
+</li>
+<li>
+<p>Automation: SAST, dependency scanning, secrets detection, security gates in CI/CD that run on every PR, and most recently, LLMs.</p>
+</li>
+<li>
+<p>Holistic remediation: when a vulnerability pattern surfaces in a functional area, drive an initiative to close the class — a shared library, a framework guardrail, a linting rule. Closing the class beats closing the tickets.</p>
+</li>
+</ol>
+<h2 id="11-security-success-is-invisible--until-it-is-a-failure">11. Security success is invisible — until it is a failure<a href="#11-security-success-is-invisible--until-it-is-a-failure" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Security&rsquo;s value is counterfactual by design. You&rsquo;re selling the absence of bad outcomes, which is invisible until it isn&rsquo;t. The &ldquo;we didn&rsquo;t get hacked — why do we even need a security team?&rdquo; question is a predictable trap. When things are quiet, there&rsquo;s nothing visible to point to; when something goes wrong, the case for security makes itself — but at too high a cost.</p>
+<p>The measurement gap is real — work around it. SLA compliance, MTTR, vulnerability age, findings caught pre-production are useful signals, but proxies for value, not proof of it. Tell the risk reduction story proactively: here&rsquo;s what we found before it became a breach, here&rsquo;s how the attack surface changed over the past year, here&rsquo;s what we closed before a researcher or an attacker got there first.</p>
+<p>Security that only shows up in the numbers after an incident has already lost the framing war — and ironically, that&rsquo;s often when companies make their first Product Security hire.</p>
+<hr>
+<p>Done well, product security is invisible: engineers ship without friction, teams collaborate without tension, and executives make informed decisions without needing a crisis to focus them. Getting there is a journey — but not an impossible one.</p>
+
+			</div>
+			
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://obormot.github.io/posts/copy-fail-kubernetes-escape/">
+				<span class="post-nav-label">&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="12 5 19 12 12 19"></polyline>
+   </svg></span><br><span>copy.fail: From kernel CVE to Kubernetes Container Escape</span>
+			</a>
+		</div>
+		<div id="comments" class="thin"></div>
+	</main>
+<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+<p>
+	&copy; 2026 <a href="https://obormot.github.io/">brain overflow</a>
+	&#183; 
+	
+	</p></footer>
+<script async src="https://obormot.github.io/js/main.min.0d576c274958ef57c819bb15e6a752b006c7d7982fefe4b3581ba126929d0de2.js" integrity="sha256-DVdsJ0lY71fIGbsV5qdSsAbH15gv7+SzWBuhJpKdDeI=" crossorigin="anonymous"></script><script async src="https://obormot.github.io/js/social-share.min.24409a4f6e5537d70ffc55ec8f9192208d718678cb8638585342423020b37f39.js" integrity="sha256-JECaT25VN9cP/FXsj5GSII1xhnjLhjhYU0JCMCCzfzk=" crossorigin="anonymous"></script></body>
+</html>
