@@ -568,8 +568,8 @@
 			<link>https://obormot.github.io/about/</link>
 			<pubDate>Sun, 26 Apr 2026 13:41:00 -0700</pubDate><guid>https://obormot.github.io/about/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p>Hey, I&rsquo;m Oskar - security engineer, threat researcher, AI enthusiast and recovering perfectionist.</p>
-<p>I spend most of my time helping product engineering teams design and ship software securely. I&rsquo;ve been doing this kind of work across research, engineering, and leadership for a couple of decades, and I still get reasonably excited when thoughtful design actually raises the bar for attackers.</p>
-<p>This blog is where I write about security, AI systems, and technical rabbit holes. Posts here are opinionated, not meant to be taken too seriously, and yup — I use LLMs to save time and help me crunch words, charts, and code. I&rsquo;ve put in the time keeping them honest — and gotten pretty good at spotting hallucinations. The ideas here are all mine, originating from a brain that is occasionally overflowing.</p>
+<p>I write about practical product security, applied AI, and occasional deep technical dives. The posts here are opinionated — they reflect how I actually think about problems.</p>
+<p>I use LLMs as writing tools and fact-check their output. The ideas however are all mine, originating from a brain that is occasionally overflowing.</p>
 <h3 id="why-brain-overflow">why &ldquo;brain overflow&rdquo;?<a href="#why-brain-overflow" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
