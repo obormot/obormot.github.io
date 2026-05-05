@@ -29,8 +29,8 @@
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>A CVSS score means nothing to an executive. A risk item must answer: what&rsquo;s the realistic scenario, what does it cost if it happens, what does it cost to fix, what&rsquo;s your recommendation? Security decisions are business decisions — they belong at the executive level, framed in business language.</p>
-<p>For the highest-stakes decisions — security exceptions, risks above a materiality threshold — get explicit executive sign-off. It moves accountability to where the decision lives.</p>
+<p>A CVSS score means nothing to an executive. A risk item must answer: what&rsquo;s the realistic scenario, what does it cost if it happens, what does it cost to fix, what&rsquo;s your recommendation? When security decisions carry significant business risk, frame them in business language.</p>
+<p>Seek explicit executive sign-off for security exceptions and risks above a materiality threshold — it moves accountability to where the decision lives.</p>
 <p><strong>Risk = Severity × Potential Impact</strong> — the key formula that turns a vulnerability into a business decision.</p>
 <h2 id="3-security-architecture">3. Security Architecture<a href="#3-security-architecture" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
