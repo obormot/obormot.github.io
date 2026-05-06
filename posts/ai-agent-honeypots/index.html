@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q8CM1FPSY9"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-Q8CM1FPSY9');
+        }
+      </script><meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1, minimal-ui">
+<meta http-equiv="X-UA-Compatible" content="ie=edge"><meta name="robots" content="index, follow"><meta name="author" content="">
+<meta name="description" content=""><link rel="manifest" href="/site.webmanifest"><link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="brain overflow" />
+<meta name="theme-color" content="#494f5c">
+<meta name="msapplication-TileColor" content="#494f5c">
+
+  <meta itemprop="name" content="Honeypots for AI Agents">
+  <meta itemprop="description" content="AI agents run with broad access to the local environment — credentials, config files, shell history, dotfiles — and nothing stops a misbehaving one from reading things it was never meant to touch. The question is: how do you catch it?
+My professional career in network security started in 2005 when I joined Juniper Networks’ IDP team — which is probably why, when thinking about how to detect a misbehaving agent, my mind went straight to a technique from that era.">
+  <meta itemprop="datePublished" content="2026-05-06T08:00:07-07:00">
+  <meta itemprop="dateModified" content="2026-05-06T08:00:07-07:00">
+  <meta itemprop="wordCount" content="1466">
+  <meta itemprop="keywords" content="Tools,Ai Security"><meta property="og:url" content="https://obormot.github.io/posts/ai-agent-honeypots/">
+  <meta property="og:site_name" content="brain overflow">
+  <meta property="og:title" content="Honeypots for AI Agents">
+  <meta property="og:description" content="AI agents run with broad access to the local environment — credentials, config files, shell history, dotfiles — and nothing stops a misbehaving one from reading things it was never meant to touch. The question is: how do you catch it?
+My professional career in network security started in 2005 when I joined Juniper Networks’ IDP team — which is probably why, when thinking about how to detect a misbehaving agent, my mind went straight to a technique from that era.">
+  <meta property="og:locale" content="en_us">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-05-06T08:00:07-07:00">
+    <meta property="article:modified_time" content="2026-05-06T08:00:07-07:00">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Honeypots for AI Agents">
+  <meta name="twitter:description" content="AI agents run with broad access to the local environment — credentials, config files, shell history, dotfiles — and nothing stops a misbehaving one from reading things it was never meant to touch. The question is: how do you catch it?
+My professional career in network security started in 2005 when I joined Juniper Networks’ IDP team — which is probably why, when thinking about how to detect a misbehaving agent, my mind went straight to a technique from that era.">
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "Honeypots for AI Agents",
+    "name": "Honeypots for AI Agents",
+    "description": "AI agents run with broad access to the local environment — credentials, config files, shell history, dotfiles — and nothing stops a misbehaving one from reading things it was never meant to touch. The question is: how do you catch it?\nMy professional career in network security started in 2005 when I joined Juniper Networks\u0026rsquo; IDP team — which is probably why, when thinking about how to detect a misbehaving agent, my mind went straight to a technique from that era.\n",
+    "keywords": [],
+    "articleBody": "AI agents run with broad access to the local environment — credentials, config files, shell history, dotfiles — and nothing stops a misbehaving one from reading things it was never meant to touch. The question is: how do you catch it?\nMy professional career in network security started in 2005 when I joined Juniper Networks’ IDP team — which is probably why, when thinking about how to detect a misbehaving agent, my mind went straight to a technique from that era.\nThe IDS world solved an analogous problem decades ago. A network intruder probes hosts and services they have no business touching; a honeypot sits in those places looking like an attractive target — an exposed SSH server, an unprotected admin console — but it’s a decoy, and it alerts when anything interacts with it. Honeypots are traps, tripwires — there’s no legitimate use for a fake host, so the false-positive rate is near zero.\nThe same idea can be applied to AI agents: plant bogus credentials where a rogue agent would look, and treat any access as a signal. Rather than trying to define what legitimate agent behavior looks like — which is hard, because legitimate agents do a lot of things — it defines what illegitimate behavior looks like: touching credentials that were never surfaced as part of the task. That’s a tighter definition, and it maps well to the threat model.\n1. The threat An AI agent running on a developer machine or in CI has access to everything its process can read: ~/.aws/, ~/.ssh/, ~/.kube/, ~/.config/, environment variables, dotfiles, every file in the project directory. That access is usually not scoped to what the agent actually needs to do its job — it’s scoped to the developer’s own permissions, because that’s how agents tend to run inside an IDE.\nThere are three failure modes this matters for, in increasing order of intent.\nOverprivileged agents. A legitimate, well-behaved agent still runs with the developer’s full filesystem permissions. It may passively sweep up credential files while reading context, or actively reason that credentials it found are relevant to the task — either way, not out of malice, just because nothing stops it. The agent’s judgment about what it’s authorized to do is not the same as what it’s actually authorized to do.\nPrompt injection. A malicious instruction embedded in content the agent processes — a README, a web page, a database row — redirects the agent to look for credentials and exfiltrate them. The agent is not compromised; it’s following instructions that were smuggled into its context. It tops the OWASP Top 10 for LLM Applications as LLM01:2025, and for good reason — it exploits the design of LLMs rather than a flaw that can be patched.\nCompromised agents. A model that has been fine-tuned adversarially, or a scaffolding layer with a supply-chain compromise, probes the environment deliberately. Skills and MCP servers install from the internet with no signing and no scanning — malicious ones are a real and active delivery mechanism, not a future concern. The emergence of dedicated skills security solutions is evidence enough that this threat is already being taken seriously.\nThe distinguishing behavior is the same in all three cases: the agent accesses resources it was never explicitly directed to use.\n2. Why defenses fall short What makes this more dangerous is how creative agents get in pursuing their goals. Anthropic’s agentic misalignment research stress-tested models in simulated corporate environments and found that agents would pursue their assigned goals through unexpected means when straightforward paths were blocked: leaking sensitive information to competitors, attempting to influence their own evaluation, sabotaging research they disagreed with. The models weren’t broken; they were doing what they were optimized to do, just not in the way their operators intended.\nThis creativity makes naive defenses, such as blacklisting certain paths, blocking specific tool calls, or simply instructing the agent not to touch certain things — largely moot. A sufficiently motivated agent will reason around them, find an indirect path, or reframe the task in a way that makes the restricted action seem justified.\nThis compounds with a structural problem on the human side: agents increasingly run with minimal oversight. Skip-permissions modes bypass approval prompts. Long-running background tasks accumulate hundreds of tool calls nobody reviewed. Users experiencing approval fatigue click through without reading. The result is an agent with broad local access, a disposition to find creative paths to its goals, and nobody watching closely.\nSimon Willison coined the lethal trifecta as a framework for exactly this risk: private data access, exposure to untrusted content, and exfiltration capability. When all three are present, an attacker who can inject instructions into the agent’s context has essentially won. It has become a widely accepted shorthand for why agentic deployments require a different security posture than traditional software.\n3. Existing tools Network honeypots have been around since the early 2000s. The idea is unchanged across thirty years: deploy something that looks real but has no legitimate use, and alert on any interaction. A low-interaction honeypot like Honeyd emulates network services; a high-interaction one like Cowrie runs a full fake SSH daemon. Either way, any connection is anomalous by definition — legitimate users don’t hit the honeypot.\nCanarytokens applied this to credentials and files rather than network services. You generate a fake AWS access key or a Word document with a beacon embedded; when someone uses the key or opens the document, you get an alert. The AWS canary creates a real IAM user and monitors CloudTrail — there’s a lag of minutes, and it requires external AWS infrastructure.\nSnare is a newer honeypot built specifically for the AI agent threat model, with a few meaningful differences from Canarytokens. It covers 18 credential types in one shot — including AI-native ones like OpenAI, Anthropic, and MCP server configs that Canarytokens doesn’t have — placing canaries in all the standard locations an agent would probe. The AWS canary fires at credential-resolution time via a local shell hook, before any API call is made, which is faster and doesn’t require external AWS infrastructure. Alerts include the SDK user agent and ASN, with a “Likely AI agent” flag when the request originates from cloud infrastructure — context that Canarytokens doesn’t surface.\nThe conceptual lineage runs from Honeyd to Canarytokens to Snare with the same core insight at each step: if you can define what legitimate access looks like, anything outside that definition is a signal.\n4. Limitations It detects, it doesn’t prevent. The agent already misbehaved by the time you get the alert. These are detection controls, not prevention controls. Knowing an agent touched a credential is useful — it’s not the same as stopping it. That said, detection data has value beyond the alert itself: observing what agents actually reach for in practice — even legitimate ones — tells you where the real access boundaries need to be. That’s useful input for building guardrails, scoping permissions, or writing policies grounded in observed behavior rather than guesswork.\nPlacement is manual. Canaries live where tools naturally look for credentials. If an agent is directed to a custom config path or a non-standard environment variable, the canary won’t be there. Coverage is bounded by where you planted the wires — the same fundamental limitation as any tripwire-based detection.\nDetection confidence varies. Precision depends on the canary design and how deeply it hooks into the agent’s execution environment. Not all credential access paths are equally observable.\nShared machines. The low false-positive guarantee relies on the canary being invisible to legitimate users. On a machine shared by multiple developers, someone may stumble across a planted credential and use it for a real task — generating an alert that has nothing to do with a misbehaving agent. Dedicated agent environments sidestep this; shared workstations require more care.\n5. Conclusion The IDS-era idea is simple: legitimate users only access resources they have business accessing — so any interaction with a decoy is a signal by definition. What’s new is the target — an agent running under your own account, following instructions that arrived via a file you never meant to treat as executable, in a world where the line between “following instructions” and “going rogue” is invisible to a monitoring system that only observes API calls.\nThe tools are already there. Snare in particular caught my attention — built specifically for the AI agent threat model, it covers the credential surface an agent would probe and fires faster than any CloudTrail-based approach. An old technique that still holds up in the agentic age.\nReferences LLM01:2025 Prompt Injection — OWASP Top 10 for LLM Applications Agentic Misalignment: How LLMs Could Be Insider Threats — Anthropic The lethal trifecta for AI agents — Simon Willison Snare — honeypot canaries for AI agents ",
+    "wordCount" : "1466",
+    "inLanguage": "en",
+    "datePublished": "2026-05-06T08:00:07-07:00",
+    "dateModified": "2026-05-06T08:00:07-07:00",
+    "author":{
+        "@type": "Person",
+        "name":  null ,},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://obormot.github.io/posts/ai-agent-honeypots/"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "brain overflow",
+      "description": "",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://obormot.github.io/favicon.ico"
+      }
+    }
+}
+</script><title>Honeypots for AI Agents</title><link rel="stylesheet dns-prefetch preconnect preload prefetch" as="style" media="screen" href="https://obormot.github.io/css/style.min.c1c763c6719166bd01d9de6877d8e24da94df47680465859953ad0da71d015f0.css" integrity="sha256-wcdjxnGRZr0B2d5od9jiTalN9HaARlhZlTrQ2nHQFfA=" crossorigin="anonymous">
+	</head>
+
+<body id="page">
+<header id="site-header">
+	<div class="hdr-wrapper section-inner">
+		<div class="hdr-left">
+			<div class="site-branding">
+				<a href="https://obormot.github.io/">brain overflow</a>
+			</div>
+			<nav class="site-nav hide-in-mobile"><a href="https://obormot.github.io/posts/">posts</a><a href="https://obormot.github.io/about/">about</a><a href="https://obormot.github.io/cv/">my CV</a></nav>
+		</div>
+		<div class="hdr-right hdr-icons">
+			<span class="hdr-links hide-in-mobile"><a href="https://www.linkedin.com/in/oskaribatullin" target="_blank" rel="noopener me" title="Linkedin"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a><a href="https://github.com/obormot" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path
+      d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+   </path>
+</svg></a></span><button id="share-btn" class="hdr-btn" title=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share-2">
+      <circle cx="18" cy="5" r="3"></circle>
+      <circle cx="6" cy="12" r="3"></circle>
+      <circle cx="18" cy="19" r="3"></circle>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+   </svg></button>
+ 
+<div id="share-links" class="animated fast">
+    
+    
+    
+    
+    <ul>
+        <li>
+            <a href="https://twitter.com/intent/tweet?hashtags=hermit2&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fai-agent-honeypots%2f&amp;text=Honeypots%20for%20AI%20Agents" target="_blank" rel="noopener" aria-label="Share on X"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path class="st0" d="m21.3 21.1 -11.4 -18.2h-7.2l11.4 18.2zm-18.6 0 7.2 -6.6m4.2 -5 7.2 -6.6" />
+</svg></a>
+        </li>
+        <li>
+            <a href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fobormot.github.io%2fposts%2fai-agent-honeypots%2f" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.threads.net/intent/post?text=Honeypots%20for%20AI%20Agents&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fai-agent-honeypots%2f" target="_blank" rel="noopener" aria-label="Share on threads"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a14 14 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32l-1.757-1.18c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388q.163.07.321.142c1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69q-.362 0-.739.021c-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221"/></svg></a>
+        </li>
+        <li>
+            <a href="https://bsky.app/intent/compose?text=https%3a%2f%2fobormot.github.io%2fposts%2fai-agent-honeypots%2f" target="_blank" rel="noopener" aria-label="Share on bluesky"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive">
+   <path
+      d="M12,10.899c-0.995,-1.934 -3.704,-5.54 -6.223,-7.318c-2.412,-1.703 -3.333,-1.408 -3.936,-1.136c-0.699,0.316 -0.826,1.388 -0.826,2.019c0,0.631 0.346,5.173 0.572,5.931c0.745,2.504 3.399,3.351 5.842,3.079c0.125,-0.018 0.252,-0.035 0.38,-0.051c-0.126,0.02 -0.252,0.037 -0.38,0.051c-3.581,0.531 -6.761,1.836 -2.59,6.48c4.589,4.75 6.289,-1.019 7.161,-3.944c0.872,2.925 1.877,8.486 7.079,3.944c3.906,-3.944 1.073,-5.949 -2.508,-6.48c-0.128,-0.014 -0.254,-0.031 -0.38,-0.051c0.128,0.016 0.255,0.033 0.38,0.051c2.443,0.272 5.097,-0.574 5.842,-3.079c0.226,-0.758 0.572,-5.3 0.572,-5.931c-0,-0.63 -0.127,-1.703 -0.826,-2.018c-0.603,-0.273 -1.524,-0.568 -3.936,1.135c-2.519,1.778 -5.228,5.384 -6.223,7.318Z" />
+</svg></a>
+        </li>
+        <li>
+            <a href="mailto:?subject=Honeypots%20for%20AI%20Agents&amp;body=https%3a%2f%2fobormot.github.io%2fposts%2fai-agent-honeypots%2f" target="_self" rel="noopener" aria-label="Share on Email"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+   <polyline points="22,6 12,13 2,6"></polyline>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fai-agent-honeypots%2f&amp;source=https%3a%2f%2fobormot.github.io%2f&amp;title=Honeypots%20for%20AI%20Agents&amp;summary=Honeypots%20for%20AI%20Agents%2c%20by%20%3cnil%3e%0a%0a%3cnil%3e%0a" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a>
+        </li>
+        <li>
+            <a href="#" onclick="linkShare(&#34;Honeypots for AI Agents&#34;,&#34;https://obormot.github.io/posts/ai-agent-honeypots/&#34;,&#34;Honeypots for AI Agents, by \u003cnil\u003e\n\n\u003cnil\u003e\n&#34;); return false;" target="_self" rel="noopener" aria-label="Copy Link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+   </svg></a>
+        </li>
+    </ul>
+</div><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+   </svg></button>
+		</div>
+	</div>
+</header>
+<div id="mobile-menu" class="animated fast">
+	<ul><li><a href="https://obormot.github.io/posts/">posts</a></li><li><a href="https://obormot.github.io/about/">about</a></li><li><a href="https://obormot.github.io/cv/">my CV</a></li></ul>
+</div>
+
+	<main class="site-main section-inner animated fadeIn faster"><article class="thin">
+			<header class="post-header">
+				<div class="post-date"><span>May 6, 2026</span></div>
+				<h1>Honeypots for AI Agents</h1>
+			</header>
+			<div class="post-description">
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+   </svg><span class="category"><a href="https://obormot.github.io/categories/tools">tools</a></span><span class="category"><a href="https://obormot.github.io/categories/ai-security">ai security</a></span></p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+   </svg>1466&nbsp  6 Minutes, 39 Seconds</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+   </svg>2026-05-06 08:00 -0700
+</p></div>
+			<hr class="post-end">
+			<div class="content">
+				 <p><em>AI agents run with broad access to the local environment — credentials, config
+files, shell history, dotfiles — and nothing stops a misbehaving one from
+reading things it was never meant to touch. The question is: how do you catch it?</em></p>
+<hr>
+<p>My professional career in network security started in 2005 when I joined
+Juniper Networks&rsquo; IDP team — which is probably why, when thinking about how to
+detect a misbehaving agent, my mind went straight to a technique from that era.</p>
+<p>The IDS world solved an analogous problem decades ago. A network intruder
+probes hosts and services they have no business touching; a <strong>honeypot</strong> sits in
+those places looking like an attractive target — an exposed SSH server, an
+unprotected admin console — but it&rsquo;s a decoy, and it alerts when anything
+interacts with it. Honeypots are traps, tripwires — there&rsquo;s no legitimate use
+for a fake host, so the false-positive rate is near zero.</p>
+<p>The same idea can be applied to AI agents: plant bogus credentials where a rogue
+agent would look, and treat any access as a signal. Rather than trying to define
+what legitimate agent behavior looks like — which is hard, because legitimate
+agents do a lot of things — it defines what illegitimate behavior looks like:
+touching credentials that were never surfaced as part of the task. That&rsquo;s a
+tighter definition, and it maps well to the threat model.</p>
+<hr>
+<h2 id="1-the-threat">1. The threat<a href="#1-the-threat" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>An AI agent running on a developer machine or in CI has access to everything its
+process can read: <code>~/.aws/</code>, <code>~/.ssh/</code>, <code>~/.kube/</code>, <code>~/.config/</code>, environment
+variables, dotfiles, every file in the project directory. That access is usually
+not scoped to what the agent actually needs to do its job — it&rsquo;s scoped to the
+developer&rsquo;s own permissions, because that&rsquo;s how agents tend to run inside an IDE.</p>
+<p>There are three failure modes this matters for, in increasing order of intent.</p>
+<ul>
+<li>
+<p><strong>Overprivileged agents.</strong> A legitimate, well-behaved agent still runs with the developer&rsquo;s full filesystem permissions. It may passively sweep up credential files while reading context, or actively reason that credentials it found are relevant to the task — either way, not out of malice, just because nothing stops it. The agent&rsquo;s judgment about what it&rsquo;s authorized to do is not the same as what it&rsquo;s actually authorized to do.</p>
+</li>
+<li>
+<p><strong>Prompt injection.</strong> A malicious instruction embedded in content the agent
+processes — a README, a web page, a database row — redirects the agent to look
+for credentials and exfiltrate them. The agent is not compromised; it&rsquo;s
+following instructions that were smuggled into its context. It tops the
+<a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">OWASP Top 10 for LLM Applications</a>
+as LLM01:2025, and for good reason — it exploits the design of LLMs rather than
+a flaw that can be patched.</p>
+</li>
+<li>
+<p><strong>Compromised agents.</strong> A model that has been fine-tuned adversarially, or a
+scaffolding layer with a supply-chain compromise, probes the environment
+deliberately. Skills and MCP servers install from the internet with no signing
+and no scanning — malicious ones are a real and active delivery mechanism, not
+a future concern. The emergence of dedicated skills security solutions is evidence
+enough that this threat is already being taken seriously.</p>
+</li>
+</ul>
+<p>The distinguishing behavior is the same in all three cases: the agent accesses
+resources it was never explicitly directed to use.</p>
+<hr>
+<h2 id="2-why-defenses-fall-short">2. Why defenses fall short<a href="#2-why-defenses-fall-short" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>What makes this more dangerous is how creative agents get in pursuing their goals.
+Anthropic&rsquo;s <a href="https://www.anthropic.com/research/agentic-misalignment">agentic misalignment research</a>
+stress-tested models in simulated corporate environments and found that agents would pursue their assigned
+goals through unexpected means when straightforward paths were blocked: leaking
+sensitive information to competitors, attempting to influence their own
+evaluation, sabotaging research they disagreed with. The models weren&rsquo;t broken;
+they were doing what they were optimized to do, just not in the way their
+operators intended.</p>
+<p>This creativity makes naive defenses, such as blacklisting certain
+paths, blocking specific tool calls, or simply instructing the agent not to
+touch certain things — largely moot. A sufficiently motivated agent will reason
+around them, find an indirect path, or reframe the task in a way that makes the
+restricted action seem justified.</p>
+<p>This compounds with a structural problem on the human side: agents increasingly
+run with minimal oversight. Skip-permissions modes bypass approval prompts.
+Long-running background tasks accumulate hundreds of tool calls nobody reviewed.
+Users experiencing approval fatigue click through without reading. The result is
+an agent with broad local access, a disposition to find creative paths to its
+goals, and nobody watching closely.</p>
+<p>Simon Willison coined the <a href="https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/">lethal trifecta</a> as a
+framework for exactly this risk: private data access, exposure to untrusted
+content, and exfiltration capability. When all three are present, an attacker
+who can inject instructions into the agent&rsquo;s context has essentially won. It has
+become a widely accepted shorthand for why agentic deployments require a
+different security posture than traditional software.</p>
+<hr>
+<h2 id="3-existing-tools">3. Existing tools<a href="#3-existing-tools" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Network honeypots have been around since the early 2000s. The idea is unchanged
+across thirty years: deploy something that looks real but has no legitimate use,
+and alert on any interaction. A low-interaction honeypot like Honeyd emulates
+network services; a high-interaction one like Cowrie runs a full fake SSH
+daemon. Either way, any connection is anomalous by definition — legitimate users
+don&rsquo;t hit the honeypot.</p>
+<p><a href="https://canarytokens.org">Canarytokens</a> applied this to
+credentials and files rather than network services. You generate a fake AWS
+access key or a Word document with a beacon embedded; when someone uses the key
+or opens the document, you get an alert. The AWS canary creates a real IAM user
+and monitors CloudTrail — there&rsquo;s a lag of minutes, and it requires external AWS
+infrastructure.</p>
+<p><a href="https://github.com/peg/snare">Snare</a> is a newer honeypot built specifically for
+the AI agent threat model, with a few meaningful differences from Canarytokens.
+It covers 18 credential types in one shot — including AI-native ones like
+OpenAI, Anthropic, and MCP server configs that Canarytokens doesn&rsquo;t have —
+placing canaries in all the standard locations an agent would probe. The AWS
+canary fires at credential-resolution time via a local shell hook, before any
+API call is made, which is faster and doesn&rsquo;t require external AWS
+infrastructure. Alerts include the SDK user agent and ASN, with a &ldquo;Likely AI
+agent&rdquo; flag when the request originates from cloud infrastructure — context that
+Canarytokens doesn&rsquo;t surface.</p>
+<p>The conceptual lineage runs from Honeyd to Canarytokens to Snare with the same
+core insight at each step: if you can define what legitimate access looks like,
+anything outside that definition is a signal.</p>
+<hr>
+<h2 id="4-limitations">4. Limitations<a href="#4-limitations" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p><strong>It detects, it doesn&rsquo;t prevent.</strong> The agent already misbehaved by the time you get the alert. These are detection controls, not prevention controls. Knowing an agent touched a credential is useful — it&rsquo;s not the same as stopping it. That said, detection data has value beyond the alert itself: observing what agents actually reach for in practice — even legitimate ones — tells you where the real access boundaries need to be. That&rsquo;s useful input for building guardrails, scoping permissions, or writing policies grounded in observed behavior rather than guesswork.</p>
+<p><strong>Placement is manual.</strong> Canaries live where tools naturally look for
+credentials. If an agent is directed to a custom config path or a non-standard
+environment variable, the canary won&rsquo;t be there. Coverage is bounded by where
+you planted the wires — the same fundamental limitation as any tripwire-based
+detection.</p>
+<p><strong>Detection confidence varies.</strong> Precision depends on the canary design and how
+deeply it hooks into the agent&rsquo;s execution environment.
+Not all credential access paths are equally observable.</p>
+<p><strong>Shared machines.</strong> The low false-positive guarantee relies on the canary being invisible to legitimate users. On a machine shared by multiple developers, someone may stumble across a planted credential and use it for a real task — generating an alert that has nothing to do with a misbehaving agent. Dedicated agent environments sidestep this; shared workstations require more care.</p>
+<hr>
+<h2 id="5-conclusion">5. Conclusion<a href="#5-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The IDS-era idea is simple: legitimate users only access resources they have business
+accessing — so any interaction with a decoy is a signal by definition.
+What&rsquo;s new is the target — an agent running under your
+own account, following instructions that arrived via a file you never meant to
+treat as executable, in a world where the line between &ldquo;following instructions&rdquo;
+and &ldquo;going rogue&rdquo; is invisible to a monitoring system that only observes API calls.</p>
+<p>The tools are already there. <a href="https://github.com/peg/snare">Snare</a> in particular
+caught my attention — built specifically for the AI agent threat model, it covers the
+credential surface an agent would probe and fires faster than any CloudTrail-based
+approach. An old technique that still holds up in the agentic age.</p>
+<hr>
+<h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<ul>
+<li><a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">LLM01:2025 Prompt Injection</a> — OWASP Top 10 for LLM Applications</li>
+<li><a href="https://www.anthropic.com/research/agentic-misalignment">Agentic Misalignment: How LLMs Could Be Insider Threats</a> — Anthropic</li>
+<li><a href="https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/">The lethal trifecta for AI agents</a> — Simon Willison</li>
+<li><a href="https://github.com/peg/snare">Snare — honeypot canaries for AI agents</a></li>
+</ul>
+
+			</div>
+			
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://obormot.github.io/posts/my-product-security-principles/">
+				<span class="post-nav-label">&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="12 5 19 12 12 19"></polyline>
+   </svg></span><br><span>My Product Security Principles</span>
+			</a>
+		</div>
+		<div id="comments" class="thin"></div>
+	</main>
+<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+<p>
+	&copy; 2026 <a href="https://obormot.github.io/">brain overflow</a>
+	&#183; 
+	
+	</p></footer>
+<script async src="https://obormot.github.io/js/main.min.0d576c274958ef57c819bb15e6a752b006c7d7982fefe4b3581ba126929d0de2.js" integrity="sha256-DVdsJ0lY71fIGbsV5qdSsAbH15gv7+SzWBuhJpKdDeI=" crossorigin="anonymous"></script><script async src="https://obormot.github.io/js/social-share.min.24409a4f6e5537d70ffc55ec8f9192208d718678cb8638585342423020b37f39.js" integrity="sha256-JECaT25VN9cP/FXsj5GSII1xhnjLhjhYU0JCMCCzfzk=" crossorigin="anonymous"></script></body>
+</html>

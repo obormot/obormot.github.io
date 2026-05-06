@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+	<channel>
+		<title>Tools on brain overflow</title>
+		<link>https://obormot.github.io/categories/tools/</link>
+		<description>Recent content in Tools on brain overflow</description>
+		<generator>Hugo -- 0.160.1</generator>
+		<language>en-us</language>
+		<lastBuildDate>Wed, 06 May 2026 08:00:07 -0700</lastBuildDate>
+		<atom:link href="https://obormot.github.io/categories/tools/index.xml" rel="self" type="application/rss+xml" />
+		
+		
+		<item>
+			<title>Honeypots for AI Agents</title>
+			<link>https://obormot.github.io/posts/ai-agent-honeypots/</link>
+			<pubDate>Wed, 06 May 2026 08:00:07 -0700</pubDate><guid>https://obormot.github.io/posts/ai-agent-honeypots/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>AI agents run with broad access to the local environment — credentials, config
+files, shell history, dotfiles — and nothing stops a misbehaving one from
+reading things it was never meant to touch. The question is: how do you catch it?</em></p>
+<hr>
+<p>My professional career in network security started in 2005 when I joined
+Juniper Networks&rsquo; IDP team — which is probably why, when thinking about how to
+detect a misbehaving agent, my mind went straight to a technique from that era.</p>
+<p>The IDS world solved an analogous problem decades ago. A network intruder
+probes hosts and services they have no business touching; a <strong>honeypot</strong> sits in
+those places looking like an attractive target — an exposed SSH server, an
+unprotected admin console — but it&rsquo;s a decoy, and it alerts when anything
+interacts with it. Honeypots are traps, tripwires — there&rsquo;s no legitimate use
+for a fake host, so the false-positive rate is near zero.</p>
+<p>The same idea can be applied to AI agents: plant bogus credentials where a rogue
+agent would look, and treat any access as a signal. Rather than trying to define
+what legitimate agent behavior looks like — which is hard, because legitimate
+agents do a lot of things — it defines what illegitimate behavior looks like:
+touching credentials that were never surfaced as part of the task. That&rsquo;s a
+tighter definition, and it maps well to the threat model.</p>
+<hr>
+<h2 id="1-the-threat">1. The threat<a href="#1-the-threat" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>An AI agent running on a developer machine or in CI has access to everything its
+process can read: <code>~/.aws/</code>, <code>~/.ssh/</code>, <code>~/.kube/</code>, <code>~/.config/</code>, environment
+variables, dotfiles, every file in the project directory. That access is usually
+not scoped to what the agent actually needs to do its job — it&rsquo;s scoped to the
+developer&rsquo;s own permissions, because that&rsquo;s how agents tend to run inside an IDE.</p>
+<p>There are three failure modes this matters for, in increasing order of intent.</p>
+<ul>
+<li>
+<p><strong>Overprivileged agents.</strong> A legitimate, well-behaved agent still runs with the developer&rsquo;s full filesystem permissions. It may passively sweep up credential files while reading context, or actively reason that credentials it found are relevant to the task — either way, not out of malice, just because nothing stops it. The agent&rsquo;s judgment about what it&rsquo;s authorized to do is not the same as what it&rsquo;s actually authorized to do.</p>
+</li>
+<li>
+<p><strong>Prompt injection.</strong> A malicious instruction embedded in content the agent
+processes — a README, a web page, a database row — redirects the agent to look
+for credentials and exfiltrate them. The agent is not compromised; it&rsquo;s
+following instructions that were smuggled into its context. It tops the
+<a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">OWASP Top 10 for LLM Applications</a>
+as LLM01:2025, and for good reason — it exploits the design of LLMs rather than
+a flaw that can be patched.</p>
+</li>
+<li>
+<p><strong>Compromised agents.</strong> A model that has been fine-tuned adversarially, or a
+scaffolding layer with a supply-chain compromise, probes the environment
+deliberately. Skills and MCP servers install from the internet with no signing
+and no scanning — malicious ones are a real and active delivery mechanism, not
+a future concern. The emergence of dedicated skills security solutions is evidence
+enough that this threat is already being taken seriously.</p>
+</li>
+</ul>
+<p>The distinguishing behavior is the same in all three cases: the agent accesses
+resources it was never explicitly directed to use.</p>
+<hr>
+<h2 id="2-why-defenses-fall-short">2. Why defenses fall short<a href="#2-why-defenses-fall-short" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>What makes this more dangerous is how creative agents get in pursuing their goals.
+Anthropic&rsquo;s <a href="https://www.anthropic.com/research/agentic-misalignment">agentic misalignment research</a>
+stress-tested models in simulated corporate environments and found that agents would pursue their assigned
+goals through unexpected means when straightforward paths were blocked: leaking
+sensitive information to competitors, attempting to influence their own
+evaluation, sabotaging research they disagreed with. The models weren&rsquo;t broken;
+they were doing what they were optimized to do, just not in the way their
+operators intended.</p>
+<p>This creativity makes naive defenses, such as blacklisting certain
+paths, blocking specific tool calls, or simply instructing the agent not to
+touch certain things — largely moot. A sufficiently motivated agent will reason
+around them, find an indirect path, or reframe the task in a way that makes the
+restricted action seem justified.</p>
+<p>This compounds with a structural problem on the human side: agents increasingly
+run with minimal oversight. Skip-permissions modes bypass approval prompts.
+Long-running background tasks accumulate hundreds of tool calls nobody reviewed.
+Users experiencing approval fatigue click through without reading. The result is
+an agent with broad local access, a disposition to find creative paths to its
+goals, and nobody watching closely.</p>
+<p>Simon Willison coined the <a href="https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/">lethal trifecta</a> as a
+framework for exactly this risk: private data access, exposure to untrusted
+content, and exfiltration capability. When all three are present, an attacker
+who can inject instructions into the agent&rsquo;s context has essentially won. It has
+become a widely accepted shorthand for why agentic deployments require a
+different security posture than traditional software.</p>
+<hr>
+<h2 id="3-existing-tools">3. Existing tools<a href="#3-existing-tools" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Network honeypots have been around since the early 2000s. The idea is unchanged
+across thirty years: deploy something that looks real but has no legitimate use,
+and alert on any interaction. A low-interaction honeypot like Honeyd emulates
+network services; a high-interaction one like Cowrie runs a full fake SSH
+daemon. Either way, any connection is anomalous by definition — legitimate users
+don&rsquo;t hit the honeypot.</p>
+<p><a href="https://canarytokens.org">Canarytokens</a> applied this to
+credentials and files rather than network services. You generate a fake AWS
+access key or a Word document with a beacon embedded; when someone uses the key
+or opens the document, you get an alert. The AWS canary creates a real IAM user
+and monitors CloudTrail — there&rsquo;s a lag of minutes, and it requires external AWS
+infrastructure.</p>
+<p><a href="https://github.com/peg/snare">Snare</a> is a newer honeypot built specifically for
+the AI agent threat model, with a few meaningful differences from Canarytokens.
+It covers 18 credential types in one shot — including AI-native ones like
+OpenAI, Anthropic, and MCP server configs that Canarytokens doesn&rsquo;t have —
+placing canaries in all the standard locations an agent would probe. The AWS
+canary fires at credential-resolution time via a local shell hook, before any
+API call is made, which is faster and doesn&rsquo;t require external AWS
+infrastructure. Alerts include the SDK user agent and ASN, with a &ldquo;Likely AI
+agent&rdquo; flag when the request originates from cloud infrastructure — context that
+Canarytokens doesn&rsquo;t surface.</p>
+<p>The conceptual lineage runs from Honeyd to Canarytokens to Snare with the same
+core insight at each step: if you can define what legitimate access looks like,
+anything outside that definition is a signal.</p>
+<hr>
+<h2 id="4-limitations">4. Limitations<a href="#4-limitations" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p><strong>It detects, it doesn&rsquo;t prevent.</strong> The agent already misbehaved by the time you get the alert. These are detection controls, not prevention controls. Knowing an agent touched a credential is useful — it&rsquo;s not the same as stopping it. That said, detection data has value beyond the alert itself: observing what agents actually reach for in practice — even legitimate ones — tells you where the real access boundaries need to be. That&rsquo;s useful input for building guardrails, scoping permissions, or writing policies grounded in observed behavior rather than guesswork.</p>
+<p><strong>Placement is manual.</strong> Canaries live where tools naturally look for
+credentials. If an agent is directed to a custom config path or a non-standard
+environment variable, the canary won&rsquo;t be there. Coverage is bounded by where
+you planted the wires — the same fundamental limitation as any tripwire-based
+detection.</p>
+<p><strong>Detection confidence varies.</strong> Precision depends on the canary design and how
+deeply it hooks into the agent&rsquo;s execution environment.
+Not all credential access paths are equally observable.</p>
+<p><strong>Shared machines.</strong> The low false-positive guarantee relies on the canary being invisible to legitimate users. On a machine shared by multiple developers, someone may stumble across a planted credential and use it for a real task — generating an alert that has nothing to do with a misbehaving agent. Dedicated agent environments sidestep this; shared workstations require more care.</p>
+<hr>
+<h2 id="5-conclusion">5. Conclusion<a href="#5-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The IDS-era idea is simple: legitimate users only access resources they have business
+accessing — so any interaction with a decoy is a signal by definition.
+What&rsquo;s new is the target — an agent running under your
+own account, following instructions that arrived via a file you never meant to
+treat as executable, in a world where the line between &ldquo;following instructions&rdquo;
+and &ldquo;going rogue&rdquo; is invisible to a monitoring system that only observes API calls.</p>
+<p>The tools are already there. <a href="https://github.com/peg/snare">Snare</a> in particular
+caught my attention — built specifically for the AI agent threat model, it covers the
+credential surface an agent would probe and fires faster than any CloudTrail-based
+approach. An old technique that still holds up in the agentic age.</p>
+<hr>
+<h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<ul>
+<li><a href="https://genai.owasp.org/llmrisk/llm01-prompt-injection/">LLM01:2025 Prompt Injection</a> — OWASP Top 10 for LLM Applications</li>
+<li><a href="https://www.anthropic.com/research/agentic-misalignment">Agentic Misalignment: How LLMs Could Be Insider Threats</a> — Anthropic</li>
+<li><a href="https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/">The lethal trifecta for AI agents</a> — Simon Willison</li>
+<li><a href="https://github.com/peg/snare">Snare — honeypot canaries for AI agents</a></li>
+</ul>
+]]></content>
+		</item>
+		
+	</channel>
+</rss>
