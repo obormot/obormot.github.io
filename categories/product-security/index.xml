@@ -43,7 +43,7 @@
 		<item>
 			<title>My Product Security Principles</title>
 			<link>https://obormot.github.io/posts/my-product-security-principles/</link>
-			<pubDate>Tue, 05 May 2026 00:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/my-product-security-principles/</guid>
+			<pubDate>Sun, 10 May 2026 00:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/my-product-security-principles/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?</em></p>
 <p><em>What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.</em></p>
 <hr>
