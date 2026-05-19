@@ -80,7 +80,8 @@
         layer --- pc
         kp --- hfs
     end
-</pre><p><em>Attack sequence: the exploit loop overwrites <code>nft</code>&rsquo;s page-cache pages 4 bytes at a time; kube-proxy&rsquo;s next scheduled execution runs the shellcode and gains access to the host filesystem.</em></p>
+</pre>
+<p><em>Attack sequence: the exploit loop overwrites <code>nft</code>&rsquo;s page-cache pages 4 bytes at a time; kube-proxy&rsquo;s next scheduled execution runs the shellcode and gains access to the host filesystem.</em></p>
 <pre class="mermaid">sequenceDiagram
     participant A as Attacker pod<br/>(unprivileged)
     participant OL as overlayfs<br/>lower layer
@@ -105,7 +106,8 @@
     Note over KP: shellcode runs as root<br/>inside privileged pod
     KP->>H: mount /dev/{host root} → /mnt/host
     KP->>H: read/write host filesystem<br/>(kubeconfig, certs, Talos config)
-</pre><hr>
+</pre>
+<hr>
 <h2 id="4-attack-surface-in-production-clusters">4. Attack surface in production clusters<a href="#4-attack-surface-in-production-clusters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
@@ -248,7 +250,8 @@
 
     V <--> S
     A <--> S
-</pre><p>That last point is this post. The timing side-channel I described earlier is a <em>read</em> on the shared cache. This attack is a <em>write</em> — deliberately filling the shared pool to evict a target tenant&rsquo;s entries.</p>
+</pre>
+<p>That last point is this post. The timing side-channel I described earlier is a <em>read</em> on the shared cache. This attack is a <em>write</em> — deliberately filling the shared pool to evict a target tenant&rsquo;s entries.</p>
 <hr>
 <h2 id="2-the-attack-mechanically">2. The attack, mechanically<a href="#2-the-attack-mechanically" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
@@ -301,7 +304,8 @@
 
     classDef victim fill:#cfe8ff,stroke:#3b82f6,color:#1e40af
     classDef attacker fill:#ffe4cc,stroke:#ea580c,color:#9a3412
-</pre><p>The attacker&rsquo;s requests use <code>max_tokens=1</code> asking the model to stop after generating a single output token. Output generation is where most GPU compute goes; by minimizing output, the attacker lowers their own cost while maximizing cache pressure.</p>
+</pre>
+<p>The attacker&rsquo;s requests use <code>max_tokens=1</code> asking the model to stop after generating a single output token. Output generation is where most GPU compute goes; by minimizing output, the attacker lowers their own cost while maximizing cache pressure.</p>
 <p><code>flooder.py</code> implements the core flood loop in a few lines:</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">flood_worker</span>(stop_event, counter):
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> <span style="color:#f92672">not</span> stop_event<span style="color:#f92672">.</span>is_set():
@@ -521,7 +525,8 @@
 
     V <--> S
     A <--> S
-</pre><p><strong>System.</strong> A multi-tenant inference service. Each tenant has API access and submits standard completion requests. Tenants may share a node, or sit on different nodes behind a cache-aware router. TTFT is observable to the tenant — either via streaming response, or by timing any request with <code>max_tokens=1</code>.</p>
+</pre>
+<p><strong>System.</strong> A multi-tenant inference service. Each tenant has API access and submits standard completion requests. Tenants may share a node, or sit on different nodes behind a cache-aware router. TTFT is observable to the tenant — either via streaming response, or by timing any request with <code>max_tokens=1</code>.</p>
 <p><strong>Attacker capability.</strong> One valid API key. No privileged access. No ability to inspect server state. Ability to time HTTP responses at millisecond resolution — trivially available from any HTTP client.</p>
 <p><strong>Attacker goal.</strong> Confirm or recover another tenant&rsquo;s system prompt or shared context. System prompts frequently contain business logic and tenant-specific instructions, embedded credentials or internal URLs (a common deployment mistake), references to internal architecture, and in RAG setups verbatim passages from private documents.</p>
 <p><strong>Out of scope.</strong> Attacks requiring host access (kernel exploits, firmware, physical fabric taps). Attacks against model weights. Cache-based availability and cost attacks are covered in the companion post.</p>

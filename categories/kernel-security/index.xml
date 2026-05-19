@@ -80,7 +80,8 @@
         layer --- pc
         kp --- hfs
     end
-</pre><p><em>Attack sequence: the exploit loop overwrites <code>nft</code>&rsquo;s page-cache pages 4 bytes at a time; kube-proxy&rsquo;s next scheduled execution runs the shellcode and gains access to the host filesystem.</em></p>
+</pre>
+<p><em>Attack sequence: the exploit loop overwrites <code>nft</code>&rsquo;s page-cache pages 4 bytes at a time; kube-proxy&rsquo;s next scheduled execution runs the shellcode and gains access to the host filesystem.</em></p>
 <pre class="mermaid">sequenceDiagram
     participant A as Attacker pod<br/>(unprivileged)
     participant OL as overlayfs<br/>lower layer
@@ -105,7 +106,8 @@
     Note over KP: shellcode runs as root<br/>inside privileged pod
     KP->>H: mount /dev/{host root} → /mnt/host
     KP->>H: read/write host filesystem<br/>(kubeconfig, certs, Talos config)
-</pre><hr>
+</pre>
+<hr>
 <h2 id="4-attack-surface-in-production-clusters">4. Attack surface in production clusters<a href="#4-attack-surface-in-production-clusters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
