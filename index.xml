@@ -6,9 +6,236 @@
 		<description>Recent content on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
-		<lastBuildDate>Mon, 18 May 2026 10:00:00 -0700</lastBuildDate>
+		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
 		<atom:link href="https://obormot.github.io/index.xml" rel="self" type="application/rss+xml" />
 		
+		
+		<item>
+			<title>AI-Native Threat Modeling</title>
+			<link>https://obormot.github.io/posts/ai-native-threat-modeling/</link>
+			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://obormot.github.io/posts/ai-native-threat-modeling/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>When I ask hiring managers why they&rsquo;re opening a product security role, the answer is
+usually the same: we can&rsquo;t keep up. Development org grew, product surface expanded, and
+the security team is the bottleneck. It&rsquo;s not a problem unique to any one organization
+— it&rsquo;s the default state of product security. AI-accelerated development and vibe
+coding are making it worse: more code, shipped faster, with the same security team
+trying to keep up. The conventional wisdom is that vibe coding is a killer for AppSec
+— and on the current trajectory, it is.</em></p>
+<p><em>In this post, I argue that linear scaling won&rsquo;t solve that problem, and make the case
+that AI-generated code, treated the right way, can be a force multiplier for security.</em></p>
+<hr>
+<h2 id="1-the-appsec-scaling-problem">1. The AppSec Scaling Problem<a href="#1-the-appsec-scaling-problem" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The 1:100 ratio — one AppSec engineer for every hundred developers — is the number
+the industry has quietly accepted as roughly accurate for mature organizations. It
+sounds manageable until you sit with what it means in practice: a team of five
+reviewing the output of five hundred, under sprint pressure, across a surface that
+keeps growing. It&rsquo;s a demanding job — I wrote about <a href="/posts/thoughts-on-product-security-career/">what it actually
+takes</a>.</p>
+<p>The standard response is to hire more security engineers. That&rsquo;s reasonable when the
+ratio is temporarily out of balance, but it doesn&rsquo;t address the structural problem. If
+the development org doubled and the security team grew from five to ten, you&rsquo;re at the
+same ratio. And the ratio assumes a roughly stable development velocity. AI coding
+assistants are shattering that assumption.</p>
+<p>Developers using GitHub Copilot, Cursor, or Claude Code ship more, faster. Vibe
+coding — letting the model write code from a high-level natural language prompt
+— compresses timelines further. Features that took two weeks take days.
+The code surface is expanding at a rate that&rsquo;s no longer proportional to engineering headcount,
+which means the AppSec scaling problem is now a two-sided function: development
+velocity increasing, security team capacity roughly flat. The gap is structural, and
+it is getting wider.</p>
+<h2 id="2-where-traditional-approaches-break-down">2. Where Traditional Approaches Break Down<a href="#2-where-traditional-approaches-break-down" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The vocabulary for addressing the AppSec scaling problem is well developed:
+<strong>shift-left</strong>, <strong>secure-by-design</strong>, <strong>developer enablement</strong>, creating
+<strong>paved roads</strong>. They&rsquo;re not wrong ideas. The problem is that they all require the same
+scarce resource: AppSec time.</p>
+<p><strong>Threat modeling</strong> — the recommended practice for high-risk features — is the
+clearest example. The canonical process: the development team writes a design document;
+the security team (or a joint session) works through the STRIDE framework or similar,
+maps data flows and trust boundaries, produces a model; there&rsquo;s back-and-forth and
+eventual sign-off. This is genuinely valuable when it happens. In practice, it often doesn&rsquo;t —
+the process is time-consuming, and AppSec time is scarce.</p>
+<p>What actually happens is one of three failure modes:</p>
+<ol>
+<li><strong>Delay</strong> — security reviews become release blockers, friction accumulates,
+relationships with engineering teams deteriorate.</li>
+<li><strong>Risk-accept</strong> — features ship with &ldquo;accepted risk&rdquo; security exceptions that go
+into a backlog and are rarely revisited.</li>
+<li><strong>No review at all</strong> — code ships without security involvement, entire product areas
+built and deployed without the security team ever being in the loop.</li>
+</ol>
+<p>With AI now compressing time-to-exploitation — public vulnerabilities can have working
+proof-of-concept code within hours — the third option is no longer a viable gamble.</p>
+<p>Security code reviews have the same structural problem one step later: someone writes
+code, another team reads it, back-and-forth, sign-off. Every handoff is a scheduling
+dependency that adds release latency.</p>
+<h2 id="3-the-threat-model-maintenance-problem">3. The Threat Model Maintenance Problem<a href="#3-the-threat-model-maintenance-problem" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>There&rsquo;s a second-order problem with threat modeling that gets less attention than the
+initial production cost: <strong>drift</strong>.</p>
+<p>A threat model is created as a snapshot, but the system keeps evolving. New endpoints added,
+authentication flows refactored. Six months after a threat model is signed off, it describes
+a system that no longer looks the same.
+The question of who owns maintenance is usually a gray area: the development team didn&rsquo;t
+write the model and isn&rsquo;t trained to maintain it; the security team is not aware of changes
+and has to context-switch back into a system they last looked at months ago.
+Neither path works well in practice.</p>
+<p>Most organizations treat the threat model as a gate the security team required at feature launch —
+it was produced, the box was checked, and maintenance was never part of the contract.
+It documents what the system looked like at one point in time and then quietly expires.</p>
+<h2 id="4-the-key-insight">4. The Key Insight<a href="#4-the-key-insight" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Here&rsquo;s where the mental model needs to shift.</p>
+<p>In the current workflow, threat modeling is <strong>derivative work</strong>: a security person reads
+what a developer built and reconstructs the security-relevant picture from it — after
+the fact, inherently lossy, potentially inaccurate, and always one step behind.</p>
+<p>Open-source projects such as <a href="https://github.com/davidmatousek/tachi">Tachi</a> and several
+commercial offerings recognize this and offer tools that automate the reconstruction:
+read the codebase, analyze diffs, apply a methodology, output a structured model.
+These tools are useful, but they&rsquo;re still doing
+the same derivative work, just faster — reverse-engineering security structure from
+existing code rather than having a human do it. There&rsquo;s also a cost dimension:
+analyzing an existing codebase means feeding it back through an LLM as new input,
+which is expensive at scale. The larger and more frequently updated the codebase, the
+higher the token cost of each analysis pass.</p>
+<p>Now consider what changes when AI is writing the code — through vibe coding,
+spec-driven development, AI-generated scaffolding from a design document, or an
+agentic coding loop that implements a full feature end-to-end.</p>
+<p>It doesn&rsquo;t reverse-engineer anything — it knows, because it built it: every data flow
+it designed, every entry point it created, every asset it touched, every trust boundary
+it crossed or established, every authentication decision it made. The complete map
+required for a threat model exists as a natural byproduct of the design work the AI
+just did — and it exists <em>at the moment of creation</em>, not after. And because that
+context is already in the model&rsquo;s working window, generating the threat model alongside
+the code is parallel effort on the same inputs, with little additional token cost.</p>
+<p>The consequence of this observation is straightforward: <strong>threat models should be
+generated alongside code, as first-class artifacts, not assembled later as derivative
+documents</strong>.</p>
+<pre class="mermaid">gantt
+    title 1. Current — human-driven, sequential
+    dateFormat YYYY-MM-DD
+    axisFormat %d
+    section Developer
+    Design doc            :a1, 2024-01-01, 3d
+    Write code            :a2, 2024-01-04, 3d
+    section Reconstruct (Security)
+    Reconstruct & model   :a3, 2024-01-07, 3d
+    section Review (Security)
+    Review & sign-off     :a4, 2024-01-10, 2d
+</pre>
+<pre class="mermaid">gantt
+    title 2. AI-assisted — LLM writes code, LLM reads code
+    dateFormat YYYY-MM-DD
+    axisFormat %d
+    section Developer
+    Generate code         :b1, 2024-01-01, 3d
+    section Reconstruct (AI-assisted)
+    LLM reconstructs TM   :b2, 2024-01-04, 2d
+    section Review (Security)
+    Review & sign-off     :b3, 2024-01-06, 2d
+    section Time saved
+    time saved            :done, 2024-01-08, 4d
+</pre>
+<pre class="mermaid">gantt
+    title 3. AI-native — code and threat model in parallel
+    dateFormat YYYY-MM-DD
+    axisFormat %d
+    section Code
+    Generate code         :c1, 2024-01-01, 3d
+    section Threat Model
+    Generate threat model :c2, 2024-01-01, 3d
+    section Review (Security)
+    Review & sign-off     :c3, 2024-01-04, 2d
+    section Time saved
+    time saved            :done, 2024-01-06, 6d
+</pre>
+<p>Accuracy improves — the model is a direct output from the entity that designed the
+system, not a reconstruction. Maintenance improves because every code change can
+regenerate or update it in the same operation; the entity making the change already
+knows what changed and why. The multi-step,
+multi-team back-and-forth collapses into a single step. Security practitioners remain
+in the loop — for methodology, formal sign-off, challenging assumptions the AI didn&rsquo;t
+surface — but the labor-intensive baseline work of constructing the model moves from a
+human bottleneck to an automatic output.</p>
+<p>This is what &ldquo;shift-left&rdquo; should actually mean: not <em>have the security team review
+earlier</em>, but <em>produce the security model at the same moment the system is designed</em>.
+The security artifact is contemporaneous with the code, not chasing it.</p>
+<h2 id="5-why-threat-modeling-still-matters">5. Why Threat Modeling Still Matters<a href="#5-why-threat-modeling-still-matters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>A reasonable objection at this point: if AI writes the code, why not just ask it to
+write <em>secure</em> code and skip the threat model entirely? We should absolutely ask for
+that — but threat modeling serves purposes that &ldquo;write secure code&rdquo; doesn&rsquo;t address.</p>
+<p><strong>Security architecture documentation.</strong> Threat models capture architectural decisions
+and their security implications: trust boundaries, data classifications, what the system
+assumes about its environment, where the blast radius of a failure ends. These don&rsquo;t
+live in code. A system can be implemented correctly while making architectural
+trade-offs that accept certain risks; those trade-offs need to be explicit, owned, and
+findable.</p>
+<p><strong>Known gaps and accepted risks.</strong> Every system ships with tradeoffs —
+incomplete defenses, deferred work, risks that were evaluated and accepted.
+A threat model makes these explicit: here is what we considered, here is what we&rsquo;re
+not defending against, and here is why. This matters for accountability, for
+prioritization, and for the engineer who joins the team six months from now.</p>
+<p><strong>Compensating controls.</strong> Good security architecture is layered.
+WAF rules, rate limiting, network segmentation, monitoring and alerting — these don&rsquo;t live
+in application code, but they&rsquo;re part of the security posture. The threat model is
+where they&rsquo;re connected to the threats they compensate for. This is also where
+code-analysis-based automated tools tend to generate false positives:
+they see the change in isolation, unaware of the external controls that already
+mitigate a given risk.</p>
+<p><strong>Compliance requirements.</strong> SOC 2, PCI-DSS, ISO 27001, HIPAA, and similar frameworks
+require documented evidence of threat analysis. Auditors want artifacts. A threat model
+that exists and is demonstrably current — generated from the same
+codebase it describes — is a far stronger compliance artifact than one that was
+carefully written at launch and hasn&rsquo;t been touched since.</p>
+<p><strong>Incident response preparation.</strong> When something goes wrong — and eventually something
+does — a current threat model tells you what&rsquo;s at risk, what attacker paths exist, and
+what to prioritize. You want this analysis done before the incident, not during it.</p>
+<p><strong>Stakeholder communication.</strong> Engineering leadership, legal, product, and board-level
+security committees need to understand risk in terms they can act on. The codebase
+doesn&rsquo;t serve this purpose; a structured threat model does.</p>
+<p>The case for threat modeling doesn&rsquo;t weaken when AI writes the code — if anything,
+AI makes the security artifacts cheaper to produce, easier to keep current,
+and more consistently complete than the human-driven alternative.</p>
+<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>I think this is the direction the AI coding toolchain is already moving toward, even
+if the full vision hasn&rsquo;t arrived yet. AI coding tools are increasingly integrating
+security into the development workflow: GitHub Copilot&rsquo;s real-time vulnerability
+detection during code generation, Claude Code&rsquo;s security analysis during code review,
+Replit&rsquo;s Security Agent in the development environment. None of these offer AI-native threat
+model generation, but they signal that the industry is treating security as something
+the coding tool prioritizes and produces alongside code.
+The extension of that to living, maintained threat models is the logical next step.</p>
+<p>The reframe for ProdSec practitioners is this: stop thinking of threat
+modeling as a process your team performs on code that developers write. Start thinking
+of it as an artifact the AI coding assistant produces alongside the code, which your
+team validates, challenges, and signs off on. The security team&rsquo;s job shifts from
+construction to judgment — which is where human expertise actually compounds.</p>
+<p>The dreaded 1:100 ratio won&rsquo;t disappear. But the work of constructing and maintaining
+the threat model doesn&rsquo;t have to stay a human-hours problem. The needle can move —
+but only if the security team&rsquo;s role evolves with it.</p>
+]]></content>
+		</item>
 		
 		<item>
 			<title>The Perimeter Problem in Agentic Tools</title>
@@ -868,9 +1095,8 @@ approach. An old technique that still holds up in the agentic age.</p>
 			<title>About</title>
 			<link>https://obormot.github.io/about/</link>
 			<pubDate>Sun, 26 Apr 2026 13:41:00 -0700</pubDate><guid>https://obormot.github.io/about/</guid>
-			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p>Hey, I&rsquo;m Oskar - security engineer, threat researcher, AI enthusiast and recovering perfectionist.</p>
-<p>I write about practical product security, applied AI, and occasional deep technical dives. The posts here are opinionated — they reflect how I actually think about problems.</p>
-<p>I use LLMs as writing tools and fact-check their output. The ideas are all mine, originating from a brain that is occasionally overflowing.</p>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p>Hey, I&rsquo;m Oskar - security architect, threat researcher, AI enthusiast and recovering perfectionist.</p>
+<p>I write about practical product security, applied AI, and occasional deep technical dives. The posts here are opinionated — they reflect how I actually think about problems. I&rsquo;m a huge believer in innovation and often share novel ideas here. Subscribe for your free weekly product security idea!</p>
 <h3 id="why-brain-overflow">why &ldquo;brain overflow&rdquo;?<a href="#why-brain-overflow" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
@@ -887,11 +1113,12 @@ If something overflows my brain&rsquo;s storage quota, it gets offloaded here be
 </li>
 <li>
 <p><strong>A metaphor for the AI era.</strong><br>
-If you&rsquo;re an engineer like me, you know the feeling — new tools, new attacks, new patterns, new hype cycles, all at once. Our brains are running hot trying to keep up.</p>
+If you&rsquo;re an engineer like me, you know the feeling — new tools, new attacks, new hype cycles, all at once. Our brains are running hot trying to keep up.</p>
 </li>
 </ol>
 <p>If a post here teaches you a thing or two about security or helps you do your job better, great. Because <em>hacking is fun</em>.</p>
 <p>If you find this interesting, want to discuss, or bounce ideas — connect with me on <a href="https://www.linkedin.com/in/oskaribatullin">LinkedIn</a>.</p>
+<p><em>Disclaimer: This is my personal blog; all views are my own and do not represent the position of my past/current/future employer. I openly use LLMs as writing tools and I think it&rsquo;s Ok.</em></p>
 ]]></content>
 		</item>
 		
