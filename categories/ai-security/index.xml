@@ -239,7 +239,7 @@ but only if the security team&rsquo;s role evolves with it.</p>
 		</item>
 		
 		<item>
-			<title>The Perimeter Problem in Agentic Tools</title>
+			<title>TrustFall: The Perimeter Problem in Agentic Tools</title>
 			<link>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</link>
 			<pubDate>Mon, 18 May 2026 10:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>On May 7, 2026, Adversa AI published <a href="https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/">TrustFall</a> — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click &ldquo;Yes, I trust this folder&rdquo;, and an attacker-controlled process runs with your full OS privileges.</em></p>

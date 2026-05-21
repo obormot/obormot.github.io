@@ -239,7 +239,7 @@ but only if the security team&rsquo;s role evolves with it.</p>
 		</item>
 		
 		<item>
-			<title>The Perimeter Problem in Agentic Tools</title>
+			<title>TrustFall: The Perimeter Problem in Agentic Tools</title>
 			<link>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</link>
 			<pubDate>Mon, 18 May 2026 10:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>On May 7, 2026, Adversa AI published <a href="https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/">TrustFall</a> — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click &ldquo;Yes, I trust this folder&rdquo;, and an attacker-controlled process runs with your full OS privileges.</em></p>
@@ -363,7 +363,7 @@ A perimeter gate requires the user to reason about all downstream consequences o
 <p><strong>What works instead:</strong> for the <strong>coding round</strong>, give them a real code sample and ask them to review it for vulnerabilities. Give them a CVE and walk through the risk assessment — what&rsquo;s the realistic impact, what systems are exposed, how would you prioritize remediation? Keep a human in the loop; you want to see how they think, what they catch, what questions they ask. For <strong>system design</strong>, hand them an actual design document or a system diagram and ask them to threat model it: identify the assets worth protecting, map the trust boundaries, enumerate the threats at each boundary, reason through attack vectors — then recommend layered defenses to mitigate the risks they&rsquo;ve identified. A candidate who can do that credibly is showing you the core of the job.</p>
 <p>Software engineers and security engineers look at the same systems from different angles. Tailoring the interview process to the role isn&rsquo;t lowering the bar — it&rsquo;s raising the accuracy of the bar.</p>
 <hr>
-<p><em>Product security demands technical breadth, strong soft skills, and the ability to navigate complex organizational dynamics — all at once. Hiring for it requires a process calibrated to that reality. Is it the right career for you? Ten years in, it still is for me. I like it!</em></p>
+<p><em>Product security demands technical breadth, strong soft skills, and the ability to navigate complex organizational dynamics — all at once. Hiring for it requires a process calibrated to that reality. Is it the right career for you? Ten years in, it still is for me.</em></p>
 ]]></content>
 		</item>
 		
