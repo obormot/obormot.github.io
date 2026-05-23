@@ -30,8 +30,8 @@
   <meta itemprop="datePublished" content="2026-05-20T11:29:02-07:00">
   <meta itemprop="dateModified" content="2026-05-20T11:29:02-07:00">
   <meta itemprop="wordCount" content="1908">
-  <meta itemprop="image" content="https://obormot.github.io/posts/ai-native-threat-modeling/images/surf.png">
-  <meta itemprop="keywords" content="Product Security,Ai Security,Threat Modeling"><meta property="og:url" content="https://obormot.github.io/posts/ai-native-threat-modeling/">
+  <meta itemprop="image" content="https://brainoverflow.blog/posts/ai-native-threat-modeling/images/surf.png">
+  <meta itemprop="keywords" content="Product Security,Ai Security,Threat Modeling"><meta property="og:url" content="https://brainoverflow.blog/posts/ai-native-threat-modeling/">
   <meta property="og:site_name" content="brain overflow">
   <meta property="og:title" content="AI-Native Threat Modeling">
   <meta property="og:description" content="When I ask hiring managers why they’re opening a product security role, the answer is usually the same: we can’t keep up. Development org grew, product surface expanded, and the security team is the bottleneck. It’s not a problem unique to any one organization — it’s the default state of product security. AI-accelerated development and vibe coding are making it worse: more code, shipped faster, with the same security team trying to keep up. The conventional wisdom is that vibe coding is a killer for AppSec — and on the current trajectory, it is.">
@@ -40,10 +40,10 @@
     <meta property="article:section" content="posts">
     <meta property="article:published_time" content="2026-05-20T11:29:02-07:00">
     <meta property="article:modified_time" content="2026-05-20T11:29:02-07:00">
-    <meta property="og:image" content="https://obormot.github.io/posts/ai-native-threat-modeling/images/surf.png">
+    <meta property="og:image" content="https://brainoverflow.blog/posts/ai-native-threat-modeling/images/surf.png">
 
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://obormot.github.io/posts/ai-native-threat-modeling/images/surf.png">
+  <meta name="twitter:image" content="https://brainoverflow.blog/posts/ai-native-threat-modeling/images/surf.png">
   <meta name="twitter:title" content="AI-Native Threat Modeling">
   <meta name="twitter:description" content="When I ask hiring managers why they’re opening a product security role, the answer is usually the same: we can’t keep up. Development org grew, product surface expanded, and the security team is the bottleneck. It’s not a problem unique to any one organization — it’s the default state of product security. AI-accelerated development and vibe coding are making it worse: more code, shipped faster, with the same security team trying to keep up. The conventional wisdom is that vibe coding is a killer for AppSec — and on the current trajectory, it is.">
 
@@ -58,7 +58,7 @@
     "articleBody": "When I ask hiring managers why they’re opening a product security role, the answer is usually the same: we can’t keep up. Development org grew, product surface expanded, and the security team is the bottleneck. It’s not a problem unique to any one organization — it’s the default state of product security. AI-accelerated development and vibe coding are making it worse: more code, shipped faster, with the same security team trying to keep up. The conventional wisdom is that vibe coding is a killer for AppSec — and on the current trajectory, it is.\nIn this post, I argue that linear scaling won’t solve that problem, and make the case that AI-generated code, treated the right way, can be a force multiplier for security.\n1. The AppSec Scaling Problem The 1:100 ratio — one AppSec engineer for every hundred developers — is the number the industry has quietly accepted as roughly accurate for mature organizations. It sounds manageable until you sit with what it means in practice: a team of five reviewing the output of five hundred, under sprint pressure, across a surface that keeps growing. It’s a demanding job — I wrote about what it actually takes.\nThe standard response is to hire more security engineers. That’s reasonable when the ratio is temporarily out of balance, but it doesn’t address the structural problem. If the development org doubled and the security team grew from five to ten, you’re at the same ratio. And the ratio assumes a roughly stable development velocity. AI coding assistants are shattering that assumption.\nDevelopers using GitHub Copilot, Cursor, or Claude Code ship more, faster. Vibe coding — letting the model write code from a high-level natural language prompt — compresses timelines further. Features that took two weeks take days. The code surface is expanding at a rate that’s no longer proportional to engineering headcount, which means the AppSec scaling problem is now a two-sided function: development velocity increasing, security team capacity roughly flat. The gap is structural, and it is getting wider.\n2. Where Traditional Approaches Break Down The vocabulary for addressing the AppSec scaling problem is well developed: shift-left, secure-by-design, developer enablement, creating paved roads. They’re not wrong ideas. The problem is that they all require the same scarce resource: AppSec time.\nThreat modeling — the recommended practice for high-risk features — is the clearest example. The canonical process: the development team writes a design document; the security team (or a joint session) works through the STRIDE framework or similar, maps data flows and trust boundaries, produces a model; there’s back-and-forth and eventual sign-off. This is genuinely valuable when it happens. In practice, it often doesn’t — the process is time-consuming, and AppSec time is scarce.\nWhat actually happens is one of three failure modes:\nDelay — security reviews become release blockers, friction accumulates, relationships with engineering teams deteriorate. Risk-accept — features ship with “accepted risk” security exceptions that go into a backlog and are rarely revisited. No review at all — code ships without security involvement, entire product areas built and deployed without the security team ever being in the loop. With AI now compressing time-to-exploitation — public vulnerabilities can have working proof-of-concept code within hours — the third option is no longer a viable gamble.\nSecurity code reviews have the same structural problem one step later: someone writes code, another team reads it, back-and-forth, sign-off. Every handoff is a scheduling dependency that adds release latency.\n3. The Threat Model Maintenance Problem There’s a second-order problem with threat modeling that gets less attention than the initial production cost: drift.\nA threat model is created as a snapshot, but the system keeps evolving. New endpoints added, authentication flows refactored. Six months after a threat model is signed off, it describes a system that no longer looks the same. The question of who owns maintenance is usually a gray area: the development team didn’t write the model and isn’t trained to maintain it; the security team is not aware of changes and has to context-switch back into a system they last looked at months ago. Neither path works well in practice.\nMost organizations treat the threat model as a gate the security team required at feature launch — it was produced, the box was checked, and maintenance was never part of the contract. It documents what the system looked like at one point in time and then quietly expires.\n4. The Key Insight Here’s where the mental model needs to shift.\nIn the current workflow, threat modeling is derivative work: a security person reads what a developer built and reconstructs the security-relevant picture from it — after the fact, inherently lossy, potentially inaccurate, and always one step behind.\nOpen-source projects such as Tachi and several commercial offerings recognize this and offer tools that automate the reconstruction: read the codebase, analyze diffs, apply a methodology, output a structured model. These tools are useful, but they’re still doing the same derivative work, just faster — reverse-engineering security structure from existing code rather than having a human do it. There’s also a cost dimension: analyzing an existing codebase means feeding it back through an LLM as new input, which is expensive at scale. The larger and more frequently updated the codebase, the higher the token cost of each analysis pass.\nNow consider what changes when AI is writing the code — through vibe coding, spec-driven development, AI-generated scaffolding from a design document, or an agentic coding loop that implements a full feature end-to-end.\nIt doesn’t reverse-engineer anything — it knows, because it built it: every data flow it designed, every entry point it created, every asset it touched, every trust boundary it crossed or established, every authentication decision it made. The complete map required for a threat model exists as a natural byproduct of the design work the AI just did — and it exists at the moment of creation, not after. And because that context is already in the model’s working window, generating the threat model alongside the code is parallel effort on the same inputs, with little additional token cost.\nThe consequence of this observation is straightforward: threat models should be generated alongside code, as first-class artifacts, not assembled later as derivative documents.\ngantt title 1. Current — human-driven, sequential dateFormat YYYY-MM-DD axisFormat %d section Developer Design doc :a1, 2024-01-01, 3d Write code :a2, 2024-01-04, 3d section Reconstruct (Security) Reconstruct \u0026 model :a3, 2024-01-07, 3d section Review (Security) Review \u0026 sign-off :a4, 2024-01-10, 2d gantt title 2. AI-assisted — LLM writes code, LLM reads code dateFormat YYYY-MM-DD axisFormat %d section Developer Generate code :b1, 2024-01-01, 3d section Reconstruct (AI-assisted) LLM reconstructs TM :b2, 2024-01-04, 2d section Review (Security) Review \u0026 sign-off :b3, 2024-01-06, 2d section Time saved time saved :done, 2024-01-08, 4d gantt title 3. AI-native — code and threat model in parallel dateFormat YYYY-MM-DD axisFormat %d section Code Generate code :c1, 2024-01-01, 3d section Threat Model Generate threat model :c2, 2024-01-01, 3d section Review (Security) Review \u0026 sign-off :c3, 2024-01-04, 2d section Time saved time saved :done, 2024-01-06, 6d Accuracy improves — the model is a direct output from the entity that designed the system, not a reconstruction. Maintenance improves because every code change can regenerate or update it in the same operation; the entity making the change already knows what changed and why. The multi-step, multi-team back-and-forth collapses into a single step. Security practitioners remain in the loop — for methodology, formal sign-off, challenging assumptions the AI didn’t surface — but the labor-intensive baseline work of constructing the model moves from a human bottleneck to an automatic output.\nThis is what “shift-left” should actually mean: not have the security team review earlier, but produce the security model at the same moment the system is designed. The security artifact is contemporaneous with the code, not chasing it.\n5. Why Threat Modeling Still Matters A reasonable objection at this point: if AI writes the code, why not just ask it to write secure code and skip the threat model entirely? We should absolutely ask for that — but threat modeling serves purposes that “write secure code” doesn’t address.\nSecurity architecture documentation. Threat models capture architectural decisions and their security implications: trust boundaries, data classifications, what the system assumes about its environment, where the blast radius of a failure ends. These don’t live in code. A system can be implemented correctly while making architectural trade-offs that accept certain risks; those trade-offs need to be explicit, owned, and findable.\nKnown gaps and accepted risks. Every system ships with tradeoffs — incomplete defenses, deferred work, risks that were evaluated and accepted. A threat model makes these explicit: here is what we considered, here is what we’re not defending against, and here is why. This matters for accountability, for prioritization, and for the engineer who joins the team six months from now.\nCompensating controls. Good security architecture is layered. WAF rules, rate limiting, network segmentation, monitoring and alerting — these don’t live in application code, but they’re part of the security posture. The threat model is where they’re connected to the threats they compensate for. This is also where code-analysis-based automated tools tend to generate false positives: they see the change in isolation, unaware of the external controls that already mitigate a given risk.\nCompliance requirements. SOC 2, PCI-DSS, ISO 27001, HIPAA, and similar frameworks require documented evidence of threat analysis. Auditors want artifacts. A threat model that exists and is demonstrably current — generated from the same codebase it describes — is a far stronger compliance artifact than one that was carefully written at launch and hasn’t been touched since.\nIncident response preparation. When something goes wrong — and eventually something does — a current threat model tells you what’s at risk, what attacker paths exist, and what to prioritize. You want this analysis done before the incident, not during it.\nStakeholder communication. Engineering leadership, legal, product, and board-level security committees need to understand risk in terms they can act on. The codebase doesn’t serve this purpose; a structured threat model does.\nThe case for threat modeling doesn’t weaken when AI writes the code — if anything, AI makes the security artifacts cheaper to produce, easier to keep current, and more consistently complete than the human-driven alternative.\nConclusion I think this is the direction the AI coding toolchain is already moving toward, even if the full vision hasn’t arrived yet. AI coding tools are increasingly integrating security into the development workflow: GitHub Copilot’s real-time vulnerability detection during code generation, Claude Code’s security analysis during code review, Replit’s Security Agent in the development environment. None of these offer AI-native threat model generation, but they signal that the industry is treating security as something the coding tool prioritizes and produces alongside code. The extension of that to living, maintained threat models is the logical next step.\nThe reframe for ProdSec practitioners is this: stop thinking of threat modeling as a process your team performs on code that developers write. Start thinking of it as an artifact the AI coding assistant produces alongside the code, which your team validates, challenges, and signs off on. The security team’s job shifts from construction to judgment — which is where human expertise actually compounds.\nThe dreaded 1:100 ratio won’t disappear. But the work of constructing and maintaining the threat model doesn’t have to stay a human-hours problem. The needle can move — but only if the security team’s role evolves with it.\n",
     "wordCount" : "1908",
     "inLanguage": "en",
-    "image":"https://obormot.github.io/images/surf.png",
+    "image":"https://brainoverflow.blog/images/surf.png",
     "datePublished": "2026-05-20T11:29:02-07:00",
     "dateModified": "2026-05-20T11:29:02-07:00",
     "author":{
@@ -66,7 +66,7 @@
         "name":  null ,},
     "mainEntityOfPage": {
       "@type": "WebPage",
-      "@id": "https://obormot.github.io/posts/ai-native-threat-modeling/"
+      "@id": "https://brainoverflow.blog/posts/ai-native-threat-modeling/"
     },
     "publisher": {
       "@type": "Organization",
@@ -74,21 +74,21 @@
       "description": "",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://obormot.github.io/favicon.ico"
+        "url": "https://brainoverflow.blog/favicon.ico"
       }
     }
 }
-</script><title>AI-Native Threat Modeling</title><link rel="stylesheet dns-prefetch preconnect preload prefetch" as="style" media="screen" href="https://obormot.github.io/css/style.min.ad04b75028a1f301c56eb83bd505ab46300a3df43a69f540f7e6061e8ad79859.css" integrity="sha256-rQS3UCih8wHFbrg71QWrRjAKPfQ6afVA9+YGHorXmFk=" crossorigin="anonymous">
-	<style>.bg-img {background-image: url('https://obormot.github.io/images/surf.png');}</style></head>
+</script><title>AI-Native Threat Modeling</title><link rel="stylesheet dns-prefetch preconnect preload prefetch" as="style" media="screen" href="https://brainoverflow.blog/css/style.min.ad04b75028a1f301c56eb83bd505ab46300a3df43a69f540f7e6061e8ad79859.css" integrity="sha256-rQS3UCih8wHFbrg71QWrRjAKPfQ6afVA9+YGHorXmFk=" crossorigin="anonymous">
+	<style>.bg-img {background-image: url('https://brainoverflow.blog/images/surf.png');}</style></head>
 
 <body id="page">
 <header id="site-header">
 	<div class="hdr-wrapper section-inner">
 		<div class="hdr-left">
 			<div class="site-branding">
-				<a href="https://obormot.github.io/">brain overflow</a>
+				<a href="https://brainoverflow.blog/">brain overflow</a>
 			</div>
-			<nav class="site-nav hide-in-mobile"><a href="https://obormot.github.io/posts/">posts</a><a href="https://obormot.github.io/about/">about</a><a href="https://obormot.github.io/cv/">my CV</a></nav>
+			<nav class="site-nav hide-in-mobile"><a href="https://brainoverflow.blog/posts/">posts</a><a href="https://brainoverflow.blog/about/">about</a><a href="https://brainoverflow.blog/cv/">my CV</a></nav>
 		</div>
 		<div class="hdr-right hdr-icons">
 			<button id="img-btn" class="hdr-btn" title="Featured Image"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -122,36 +122,36 @@
     
     <ul>
         <li>
-            <a href="https://twitter.com/intent/tweet?hashtags=hermit2&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fai-native-threat-modeling%2f&amp;text=AI-Native%20Threat%20Modeling" target="_blank" rel="noopener" aria-label="Share on X"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            <a href="https://twitter.com/intent/tweet?hashtags=hermit2&amp;url=https%3a%2f%2fbrainoverflow.blog%2fposts%2fai-native-threat-modeling%2f&amp;text=AI-Native%20Threat%20Modeling" target="_blank" rel="noopener" aria-label="Share on X"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
    <path class="st0" d="m21.3 21.1 -11.4 -18.2h-7.2l11.4 18.2zm-18.6 0 7.2 -6.6m4.2 -5 7.2 -6.6" />
 </svg></a>
         </li>
         <li>
-            <a href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fobormot.github.io%2fposts%2fai-native-threat-modeling%2f" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            <a href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fbrainoverflow.blog%2fposts%2fai-native-threat-modeling%2f" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
 </svg></a>
         </li>
         <li>
-            <a href="https://www.threads.net/intent/post?text=AI-Native%20Threat%20Modeling&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fai-native-threat-modeling%2f" target="_blank" rel="noopener" aria-label="Share on threads"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a14 14 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32l-1.757-1.18c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388q.163.07.321.142c1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69q-.362 0-.739.021c-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221"/></svg></a>
+            <a href="https://www.threads.net/intent/post?text=AI-Native%20Threat%20Modeling&amp;url=https%3a%2f%2fbrainoverflow.blog%2fposts%2fai-native-threat-modeling%2f" target="_blank" rel="noopener" aria-label="Share on threads"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a14 14 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32l-1.757-1.18c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388q.163.07.321.142c1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69q-.362 0-.739.021c-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221"/></svg></a>
         </li>
         <li>
-            <a href="https://bsky.app/intent/compose?text=https%3a%2f%2fobormot.github.io%2fposts%2fai-native-threat-modeling%2f" target="_blank" rel="noopener" aria-label="Share on bluesky"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            <a href="https://bsky.app/intent/compose?text=https%3a%2f%2fbrainoverflow.blog%2fposts%2fai-native-threat-modeling%2f" target="_blank" rel="noopener" aria-label="Share on bluesky"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive">
    <path
       d="M12,10.899c-0.995,-1.934 -3.704,-5.54 -6.223,-7.318c-2.412,-1.703 -3.333,-1.408 -3.936,-1.136c-0.699,0.316 -0.826,1.388 -0.826,2.019c0,0.631 0.346,5.173 0.572,5.931c0.745,2.504 3.399,3.351 5.842,3.079c0.125,-0.018 0.252,-0.035 0.38,-0.051c-0.126,0.02 -0.252,0.037 -0.38,0.051c-3.581,0.531 -6.761,1.836 -2.59,6.48c4.589,4.75 6.289,-1.019 7.161,-3.944c0.872,2.925 1.877,8.486 7.079,3.944c3.906,-3.944 1.073,-5.949 -2.508,-6.48c-0.128,-0.014 -0.254,-0.031 -0.38,-0.051c0.128,0.016 0.255,0.033 0.38,0.051c2.443,0.272 5.097,-0.574 5.842,-3.079c0.226,-0.758 0.572,-5.3 0.572,-5.931c-0,-0.63 -0.127,-1.703 -0.826,-2.018c-0.603,-0.273 -1.524,-0.568 -3.936,1.135c-2.519,1.778 -5.228,5.384 -6.223,7.318Z" />
 </svg></a>
         </li>
         <li>
-            <a href="mailto:?subject=AI-Native%20Threat%20Modeling&amp;body=https%3a%2f%2fobormot.github.io%2fposts%2fai-native-threat-modeling%2f" target="_self" rel="noopener" aria-label="Share on Email"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            <a href="mailto:?subject=AI-Native%20Threat%20Modeling&amp;body=https%3a%2f%2fbrainoverflow.blog%2fposts%2fai-native-threat-modeling%2f" target="_self" rel="noopener" aria-label="Share on Email"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
    <polyline points="22,6 12,13 2,6"></polyline>
 </svg></a>
         </li>
         <li>
-            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fobormot.github.io%2fposts%2fai-native-threat-modeling%2f&amp;source=https%3a%2f%2fobormot.github.io%2f&amp;title=AI-Native%20Threat%20Modeling&amp;summary=AI-Native%20Threat%20Modeling%2c%20by%20%3cnil%3e%0a%0a%3cnil%3e%0a" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fbrainoverflow.blog%2fposts%2fai-native-threat-modeling%2f&amp;source=https%3a%2f%2fbrainoverflow.blog%2f&amp;title=AI-Native%20Threat%20Modeling&amp;summary=AI-Native%20Threat%20Modeling%2c%20by%20%3cnil%3e%0a%0a%3cnil%3e%0a" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
    <rect x="2" y="9" width="4" height="12"></rect>
@@ -159,7 +159,7 @@
 </svg></a>
         </li>
         <li>
-            <a href="#" onclick="linkShare(&#34;AI-Native Threat Modeling&#34;,&#34;https://obormot.github.io/posts/ai-native-threat-modeling/&#34;,&#34;AI-Native Threat Modeling, by \u003cnil\u003e\n\n\u003cnil\u003e\n&#34;); return false;" target="_self" rel="noopener" aria-label="Copy Link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            <a href="#" onclick="linkShare(&#34;AI-Native Threat Modeling&#34;,&#34;https://brainoverflow.blog/posts/ai-native-threat-modeling/&#34;,&#34;AI-Native Threat Modeling, by \u003cnil\u003e\n\n\u003cnil\u003e\n&#34;); return false;" target="_self" rel="noopener" aria-label="Copy Link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -176,7 +176,7 @@
 	</div>
 </header>
 <div id="mobile-menu" class="animated fast">
-	<ul><li><a href="https://obormot.github.io/posts/">posts</a></li><li><a href="https://obormot.github.io/about/">about</a></li><li><a href="https://obormot.github.io/cv/">my CV</a></li></ul>
+	<ul><li><a href="https://brainoverflow.blog/posts/">posts</a></li><li><a href="https://brainoverflow.blog/about/">about</a></li><li><a href="https://brainoverflow.blog/cv/">my CV</a></li></ul>
 </div>
 
 	<div class="bg-img"></div>
@@ -189,7 +189,7 @@
 <p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder">
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-   </svg><span class="category"><a href="https://obormot.github.io/categories/product-security">product security</a></span><span class="category"><a href="https://obormot.github.io/categories/ai-security">ai security</a></span><span class="category"><a href="https://obormot.github.io/categories/threat-modeling">threat modeling</a></span></p>
+   </svg><span class="category"><a href="https://brainoverflow.blog/categories/product-security">product security</a></span><span class="category"><a href="https://brainoverflow.blog/categories/ai-security">ai security</a></span><span class="category"><a href="https://brainoverflow.blog/categories/threat-modeling">threat modeling</a></span></p>
 <p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -434,7 +434,7 @@ but only if the security team&rsquo;s role evolves with it.</p>
 			
 		</article>
 		<div class="post-nav thin">
-			<a class="prev-post" href="https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/">
+			<a class="prev-post" href="https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/">
 				<span class="post-nav-label">&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">
       <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -446,11 +446,11 @@ but only if the security team&rsquo;s role evolves with it.</p>
 	</main>
 <footer id="site-footer" class="section-inner thin animated fadeIn faster">
 <p>
-	&copy; 2026 <a href="https://obormot.github.io/">brain overflow</a>
+	&copy; 2026 <a href="https://brainoverflow.blog/">brain overflow</a>
 	&#183; 
 	
 	</p></footer>
-<script async src="https://obormot.github.io/js/main.min.0d576c274958ef57c819bb15e6a752b006c7d7982fefe4b3581ba126929d0de2.js" integrity="sha256-DVdsJ0lY71fIGbsV5qdSsAbH15gv7+SzWBuhJpKdDeI=" crossorigin="anonymous"></script><script async src="https://obormot.github.io/js/social-share.min.24409a4f6e5537d70ffc55ec8f9192208d718678cb8638585342423020b37f39.js" integrity="sha256-JECaT25VN9cP/FXsj5GSII1xhnjLhjhYU0JCMCCzfzk=" crossorigin="anonymous"></script><script defer async type="module">
+<script async src="https://brainoverflow.blog/js/main.min.0d576c274958ef57c819bb15e6a752b006c7d7982fefe4b3581ba126929d0de2.js" integrity="sha256-DVdsJ0lY71fIGbsV5qdSsAbH15gv7+SzWBuhJpKdDeI=" crossorigin="anonymous"></script><script async src="https://brainoverflow.blog/js/social-share.min.24409a4f6e5537d70ffc55ec8f9192208d718678cb8638585342423020b37f39.js" integrity="sha256-JECaT25VN9cP/FXsj5GSII1xhnjLhjhYU0JCMCCzfzk=" crossorigin="anonymous"></script><script defer async type="module">
     import mermaid from 'https:\/\/cdn.jsdelivr.net\/npm\/mermaid\/dist\/mermaid.esm.min.mjs';
     mermaid.initialize({ startOnLoad: true,theme: 'dark' });
   </script></body>

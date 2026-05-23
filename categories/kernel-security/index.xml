@@ -2,18 +2,18 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
 	<channel>
 		<title>Kernel Security on brain overflow</title>
-		<link>https://obormot.github.io/categories/kernel-security/</link>
+		<link>https://brainoverflow.blog/categories/kernel-security/</link>
 		<description>Recent content in Kernel Security on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Sat, 02 May 2026 11:58:11 -0700</lastBuildDate>
-		<atom:link href="https://obormot.github.io/categories/kernel-security/index.xml" rel="self" type="application/rss+xml" />
+		<atom:link href="https://brainoverflow.blog/categories/kernel-security/index.xml" rel="self" type="application/rss+xml" />
 		
 		
 		<item>
 			<title>copy.fail: From kernel CVE to Kubernetes Container Escape</title>
-			<link>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</link>
-			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</guid>
+			<link>https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/</link>
+			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>My <a href="/posts/prefix-cache-timing-side-channel/">previous posts</a> looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other&rsquo;s data and starve each other&rsquo;s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.</em></p>
 <p><em>The xint.io team published <a href="https://xint.io/blog/copy-fail-linux-distributions">a writeup of the LPE vector</a>; as of time of this post their container-escape follow-up is not yet out. This post covers a concrete container escape chain against Talos Linux and what the vulnerability class says about shared-kernel container security.</em></p>
 <hr>

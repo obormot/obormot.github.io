@@ -2,18 +2,18 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
 	<channel>
 		<title>Product Security on brain overflow</title>
-		<link>https://obormot.github.io/categories/product-security/</link>
+		<link>https://brainoverflow.blog/categories/product-security/</link>
 		<description>Recent content in Product Security on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
-		<atom:link href="https://obormot.github.io/categories/product-security/index.xml" rel="self" type="application/rss+xml" />
+		<atom:link href="https://brainoverflow.blog/categories/product-security/index.xml" rel="self" type="application/rss+xml" />
 		
 		
 		<item>
 			<title>AI-Native Threat Modeling</title>
-			<link>https://obormot.github.io/posts/ai-native-threat-modeling/</link>
-			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://obormot.github.io/posts/ai-native-threat-modeling/</guid>
+			<link>https://brainoverflow.blog/posts/ai-native-threat-modeling/</link>
+			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://brainoverflow.blog/posts/ai-native-threat-modeling/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>When I ask hiring managers why they&rsquo;re opening a product security role, the answer is
 usually the same: we can&rsquo;t keep up. Development org grew, product surface expanded, and
 the security team is the bottleneck. It&rsquo;s not a problem unique to any one organization
@@ -240,8 +240,8 @@ but only if the security team&rsquo;s role evolves with it.</p>
 		
 		<item>
 			<title>Thoughts on Product Security Career</title>
-			<link>https://obormot.github.io/posts/thoughts-on-product-security-career/</link>
-			<pubDate>Tue, 12 May 2026 09:51:22 -0700</pubDate><guid>https://obormot.github.io/posts/thoughts-on-product-security-career/</guid>
+			<link>https://brainoverflow.blog/posts/thoughts-on-product-security-career/</link>
+			<pubDate>Tue, 12 May 2026 09:51:22 -0700</pubDate><guid>https://brainoverflow.blog/posts/thoughts-on-product-security-career/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>I recently wrote about <a href="/posts/my-product-security-principles/">my product security principles</a> — the operating frame I&rsquo;ve built for doing the job well. This is the post that probably should have come first: what product security actually is as a career, whether it might be the right path for you, and what ten years of doing it has taught me.</em></p>
 <hr>
 <p>Ten years in product security teaches you one thing above all: it is <strong>a hybrid discipline</strong>, and that is both its challenge and its appeal.</p>
@@ -270,8 +270,8 @@ but only if the security team&rsquo;s role evolves with it.</p>
 		
 		<item>
 			<title>My Product Security Principles</title>
-			<link>https://obormot.github.io/posts/my-product-security-principles/</link>
-			<pubDate>Sun, 10 May 2026 00:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/my-product-security-principles/</guid>
+			<link>https://brainoverflow.blog/posts/my-product-security-principles/</link>
+			<pubDate>Sun, 10 May 2026 00:00:00 -0700</pubDate><guid>https://brainoverflow.blog/posts/my-product-security-principles/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?</em></p>
 <p><em>What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.</em></p>
 <hr>

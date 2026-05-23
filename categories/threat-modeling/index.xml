@@ -2,18 +2,18 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
 	<channel>
 		<title>Threat Modeling on brain overflow</title>
-		<link>https://obormot.github.io/categories/threat-modeling/</link>
+		<link>https://brainoverflow.blog/categories/threat-modeling/</link>
 		<description>Recent content in Threat Modeling on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
-		<atom:link href="https://obormot.github.io/categories/threat-modeling/index.xml" rel="self" type="application/rss+xml" />
+		<atom:link href="https://brainoverflow.blog/categories/threat-modeling/index.xml" rel="self" type="application/rss+xml" />
 		
 		
 		<item>
 			<title>AI-Native Threat Modeling</title>
-			<link>https://obormot.github.io/posts/ai-native-threat-modeling/</link>
-			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://obormot.github.io/posts/ai-native-threat-modeling/</guid>
+			<link>https://brainoverflow.blog/posts/ai-native-threat-modeling/</link>
+			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://brainoverflow.blog/posts/ai-native-threat-modeling/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>When I ask hiring managers why they&rsquo;re opening a product security role, the answer is
 usually the same: we can&rsquo;t keep up. Development org grew, product surface expanded, and
 the security team is the bottleneck. It&rsquo;s not a problem unique to any one organization
@@ -240,8 +240,8 @@ but only if the security team&rsquo;s role evolves with it.</p>
 		
 		<item>
 			<title>TrustFall: The Perimeter Problem in Agentic Tools</title>
-			<link>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</link>
-			<pubDate>Mon, 18 May 2026 10:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</guid>
+			<link>https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/</link>
+			<pubDate>Mon, 18 May 2026 10:00:00 -0700</pubDate><guid>https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>On May 7, 2026, Adversa AI published <a href="https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/">TrustFall</a> — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click &ldquo;Yes, I trust this folder&rdquo;, and an attacker-controlled process runs with your full OS privileges.</em></p>
 <p><em>Anthropic declined the finding as outside their threat model and the behavior as functioning by design. This post digs into that response — and argues that the core issue is architectural: a perimeter security model that can&rsquo;t carry the weight placed on it, and that makes the vulnerability structurally hard to surface through threat modeling. It looks at what a zero trust alternative would look like for agentic tools.</em></p>
 <hr>

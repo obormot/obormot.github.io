@@ -2,69 +2,69 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://obormot.github.io/categories/ai-security/</loc>
+    <loc>https://brainoverflow.blog/categories/ai-security/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/ai-native-threat-modeling/</loc>
+    <loc>https://brainoverflow.blog/posts/ai-native-threat-modeling/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/</loc>
+    <loc>https://brainoverflow.blog/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/</loc>
+    <loc>https://brainoverflow.blog/categories/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/</loc>
+    <loc>https://brainoverflow.blog/posts/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/product-security/</loc>
+    <loc>https://brainoverflow.blog/categories/product-security/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/threat-modeling/</loc>
+    <loc>https://brainoverflow.blog/categories/threat-modeling/</loc>
     <lastmod>2026-05-20T11:29:02-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/security-architecture/</loc>
+    <loc>https://brainoverflow.blog/categories/security-architecture/</loc>
     <lastmod>2026-05-18T10:00:00-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</loc>
+    <loc>https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/</loc>
     <lastmod>2026-05-18T10:00:00-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/thoughts-on-product-security-career/</loc>
+    <loc>https://brainoverflow.blog/posts/thoughts-on-product-security-career/</loc>
     <lastmod>2026-05-12T09:51:22-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/my-product-security-principles/</loc>
+    <loc>https://brainoverflow.blog/posts/my-product-security-principles/</loc>
     <lastmod>2026-05-10T00:00:00-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/ai-agent-honeypots/</loc>
+    <loc>https://brainoverflow.blog/posts/ai-agent-honeypots/</loc>
     <lastmod>2026-05-06T08:00:07-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/tools/</loc>
+    <loc>https://brainoverflow.blog/categories/tools/</loc>
     <lastmod>2026-05-06T08:00:07-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/container-security/</loc>
+    <loc>https://brainoverflow.blog/categories/container-security/</loc>
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</loc>
+    <loc>https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/</loc>
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/kernel-security/</loc>
+    <loc>https://brainoverflow.blog/categories/kernel-security/</loc>
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/categories/research/</loc>
+    <loc>https://brainoverflow.blog/categories/research/</loc>
     <lastmod>2026-05-02T11:58:11-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/kv-cache-flood-dos/</loc>
+    <loc>https://brainoverflow.blog/posts/kv-cache-flood-dos/</loc>
     <lastmod>2026-04-27T01:53:01-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/cv/</loc>
+    <loc>https://brainoverflow.blog/cv/</loc>
     <lastmod>2026-04-26T13:55:00-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/about/</loc>
+    <loc>https://brainoverflow.blog/about/</loc>
     <lastmod>2026-04-26T13:41:00-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/posts/prefix-cache-timing-side-channel/</loc>
+    <loc>https://brainoverflow.blog/posts/prefix-cache-timing-side-channel/</loc>
     <lastmod>2026-04-25T01:51:22-07:00</lastmod>
   </url><url>
-    <loc>https://obormot.github.io/tags/</loc>
+    <loc>https://brainoverflow.blog/tags/</loc>
   </url>
 </urlset>

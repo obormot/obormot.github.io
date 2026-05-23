@@ -2,11 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
 	<channel>
 		<title>Tags on brain overflow</title>
-		<link>https://obormot.github.io/tags/</link>
+		<link>https://brainoverflow.blog/tags/</link>
 		<description>Recent content in Tags on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
-		<atom:link href="https://obormot.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+		<atom:link href="https://brainoverflow.blog/tags/index.xml" rel="self" type="application/rss+xml" />
 		
 		
 	</channel>

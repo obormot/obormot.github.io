@@ -2,18 +2,18 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
 	<channel>
 		<title>Posts on brain overflow</title>
-		<link>https://obormot.github.io/posts/</link>
+		<link>https://brainoverflow.blog/posts/</link>
 		<description>Recent content in Posts on brain overflow</description>
 		<generator>Hugo -- 0.160.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
-		<atom:link href="https://obormot.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		<atom:link href="https://brainoverflow.blog/posts/index.xml" rel="self" type="application/rss+xml" />
 		
 		
 		<item>
 			<title>AI-Native Threat Modeling</title>
-			<link>https://obormot.github.io/posts/ai-native-threat-modeling/</link>
-			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://obormot.github.io/posts/ai-native-threat-modeling/</guid>
+			<link>https://brainoverflow.blog/posts/ai-native-threat-modeling/</link>
+			<pubDate>Wed, 20 May 2026 11:29:02 -0700</pubDate><guid>https://brainoverflow.blog/posts/ai-native-threat-modeling/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>When I ask hiring managers why they&rsquo;re opening a product security role, the answer is
 usually the same: we can&rsquo;t keep up. Development org grew, product surface expanded, and
 the security team is the bottleneck. It&rsquo;s not a problem unique to any one organization
@@ -240,8 +240,8 @@ but only if the security team&rsquo;s role evolves with it.</p>
 		
 		<item>
 			<title>TrustFall: The Perimeter Problem in Agentic Tools</title>
-			<link>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</link>
-			<pubDate>Mon, 18 May 2026 10:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/perimeter-problem-in-agentic-tools/</guid>
+			<link>https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/</link>
+			<pubDate>Mon, 18 May 2026 10:00:00 -0700</pubDate><guid>https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>On May 7, 2026, Adversa AI published <a href="https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/">TrustFall</a> — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click &ldquo;Yes, I trust this folder&rdquo;, and an attacker-controlled process runs with your full OS privileges.</em></p>
 <p><em>Anthropic declined the finding as outside their threat model and the behavior as functioning by design. This post digs into that response — and argues that the core issue is architectural: a perimeter security model that can&rsquo;t carry the weight placed on it, and that makes the vulnerability structurally hard to surface through threat modeling. It looks at what a zero trust alternative would look like for agentic tools.</em></p>
 <hr>
@@ -339,8 +339,8 @@ A perimeter gate requires the user to reason about all downstream consequences o
 		
 		<item>
 			<title>Thoughts on Product Security Career</title>
-			<link>https://obormot.github.io/posts/thoughts-on-product-security-career/</link>
-			<pubDate>Tue, 12 May 2026 09:51:22 -0700</pubDate><guid>https://obormot.github.io/posts/thoughts-on-product-security-career/</guid>
+			<link>https://brainoverflow.blog/posts/thoughts-on-product-security-career/</link>
+			<pubDate>Tue, 12 May 2026 09:51:22 -0700</pubDate><guid>https://brainoverflow.blog/posts/thoughts-on-product-security-career/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>I recently wrote about <a href="/posts/my-product-security-principles/">my product security principles</a> — the operating frame I&rsquo;ve built for doing the job well. This is the post that probably should have come first: what product security actually is as a career, whether it might be the right path for you, and what ten years of doing it has taught me.</em></p>
 <hr>
 <p>Ten years in product security teaches you one thing above all: it is <strong>a hybrid discipline</strong>, and that is both its challenge and its appeal.</p>
@@ -369,8 +369,8 @@ A perimeter gate requires the user to reason about all downstream consequences o
 		
 		<item>
 			<title>My Product Security Principles</title>
-			<link>https://obormot.github.io/posts/my-product-security-principles/</link>
-			<pubDate>Sun, 10 May 2026 00:00:00 -0700</pubDate><guid>https://obormot.github.io/posts/my-product-security-principles/</guid>
+			<link>https://brainoverflow.blog/posts/my-product-security-principles/</link>
+			<pubDate>Sun, 10 May 2026 00:00:00 -0700</pubDate><guid>https://brainoverflow.blog/posts/my-product-security-principles/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>In my recent job search I read dozens of Product Security job descriptions. They all contain the same buzzword soup: shift-left, secure-by-default, defense in depth, paved roads. In practice, they mean different things at different companies — but what do they actually mean for the Product Security team?</em></p>
 <p><em>What follows is my personal operating frame. One security engineer for every hundred in engineering is roughly where the industry sits — these are my principles for operating and succeeding in that reality. And I believe they hold in a world of vibe-coded apps and AI-accelerated production code.</em></p>
 <hr>
@@ -469,8 +469,8 @@ A perimeter gate requires the user to reason about all downstream consequences o
 		
 		<item>
 			<title>Honeypots for AI Agents</title>
-			<link>https://obormot.github.io/posts/ai-agent-honeypots/</link>
-			<pubDate>Wed, 06 May 2026 08:00:07 -0700</pubDate><guid>https://obormot.github.io/posts/ai-agent-honeypots/</guid>
+			<link>https://brainoverflow.blog/posts/ai-agent-honeypots/</link>
+			<pubDate>Wed, 06 May 2026 08:00:07 -0700</pubDate><guid>https://brainoverflow.blog/posts/ai-agent-honeypots/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>AI agents run with broad access to the local environment — credentials, config
 files, shell history, dotfiles — and nothing stops a misbehaving one from
 reading things it was never meant to touch. The question is: how do you catch it?</em></p>
@@ -637,8 +637,8 @@ approach. An old technique that still holds up in the agentic age.</p>
 		
 		<item>
 			<title>copy.fail: From kernel CVE to Kubernetes Container Escape</title>
-			<link>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</link>
-			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://obormot.github.io/posts/copy-fail-kubernetes-escape/</guid>
+			<link>https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/</link>
+			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>My <a href="/posts/prefix-cache-timing-side-channel/">previous posts</a> looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other&rsquo;s data and starve each other&rsquo;s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.</em></p>
 <p><em>The xint.io team published <a href="https://xint.io/blog/copy-fail-linux-distributions">a writeup of the LPE vector</a>; as of time of this post their container-escape follow-up is not yet out. This post covers a concrete container escape chain against Talos Linux and what the vulnerability class says about shared-kernel container security.</em></p>
 <hr>
@@ -837,8 +837,8 @@ approach. An old technique that still holds up in the agentic age.</p>
 		
 		<item>
 			<title>KV Cache Flood: DoS Against Multi-Tenant LLMs</title>
-			<link>https://obormot.github.io/posts/kv-cache-flood-dos/</link>
-			<pubDate>Mon, 27 Apr 2026 01:53:01 -0700</pubDate><guid>https://obormot.github.io/posts/kv-cache-flood-dos/</guid>
+			<link>https://brainoverflow.blog/posts/kv-cache-flood-dos/</link>
+			<pubDate>Mon, 27 Apr 2026 01:53:01 -0700</pubDate><guid>https://brainoverflow.blog/posts/kv-cache-flood-dos/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em><a href="/posts/prefix-cache-timing-side-channel/">My previous post</a> covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker&rsquo;s favor.</em></p>
 <hr>
 <h2 id="tldr">TL;DR<a href="#tldr" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1085,8 +1085,8 @@ approach. An old technique that still holds up in the agentic age.</p>
 		
 		<item>
 			<title>KV Cache Timing Side-Channel in Multi-Tenant LLMs</title>
-			<link>https://obormot.github.io/posts/prefix-cache-timing-side-channel/</link>
-			<pubDate>Sat, 25 Apr 2026 01:51:22 -0700</pubDate><guid>https://obormot.github.io/posts/prefix-cache-timing-side-channel/</guid>
+			<link>https://brainoverflow.blog/posts/prefix-cache-timing-side-channel/</link>
+			<pubDate>Sat, 25 Apr 2026 01:51:22 -0700</pubDate><guid>https://brainoverflow.blog/posts/prefix-cache-timing-side-channel/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>I built a small tool to test whether a managed inference provider&rsquo;s prefix cache leaks timing information across tenant boundaries. Here&rsquo;s what I found, how to run the same test yourself, and what providers should do about it.</em></p>
 <p><em>This post covers the timing side-channel — a known attack class I&rsquo;m adding a concrete PoC and DIY testing guide to. My <a href="/posts/kv-cache-flood-dos/">next post</a> covers a novel application of the same shared-cache vulnerability in a DoS attack.</em></p>
 <hr>
