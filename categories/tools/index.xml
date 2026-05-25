@@ -4,7 +4,7 @@
 		<title>Tools on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/tools/</link>
 		<description>Recent content in Tools on brain overflow</description>
-		<generator>Hugo -- 0.160.1</generator>
+		<generator>Hugo -- 0.161.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Wed, 06 May 2026 08:00:07 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/tools/index.xml" rel="self" type="application/rss+xml" />
@@ -148,7 +148,7 @@ deeply it hooks into the agent&rsquo;s execution environment.
 Not all credential access paths are equally observable.</p>
 <p><strong>Shared machines.</strong> The low false-positive guarantee relies on the canary being invisible to legitimate users. On a machine shared by multiple developers, someone may stumble across a planted credential and use it for a real task — generating an alert that has nothing to do with a misbehaving agent. Dedicated agent environments sidestep this; shared workstations require more care.</p>
 <hr>
-<h2 id="5-conclusion">5. Conclusion<a href="#5-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>

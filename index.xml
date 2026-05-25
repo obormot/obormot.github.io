@@ -4,11 +4,98 @@
 		<title>brain overflow</title>
 		<link>https://brainoverflow.blog/</link>
 		<description>Recent content on brain overflow</description>
-		<generator>Hugo -- 0.160.1</generator>
+		<generator>Hugo -- 0.161.1</generator>
 		<language>en-us</language>
-		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
+		<lastBuildDate>Sun, 24 May 2026 13:01:31 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/index.xml" rel="self" type="application/rss+xml" />
 		
+		
+		<item>
+			<title>AI Assisted Bug Bounty Experiment</title>
+			<link>https://brainoverflow.blog/posts/ai-assisted-bug-bounty/</link>
+			<pubDate>Sun, 24 May 2026 13:01:31 -0700</pubDate><guid>https://brainoverflow.blog/posts/ai-assisted-bug-bounty/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>Five authorization bypass paths, clean PoCs for each, full disclosure report — output of a six-hour session: one human, one Claude Code agent, an idea, and a live target in Docker. I&rsquo;ll cover the technical details in a follow-up post once the disclosure process is complete.</em></p>
+<hr>
+<h2 id="1-the-experiment">1. The experiment<a href="#1-the-experiment" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>With the recent hype surrounding Mythos and its autonomous vulnerability discovery capabilities, the question of what AI can do for security research is hard to ignore. Most of that conversation centers on fully autonomous systems — multi-agent frameworks operating at scale with large budgets. I wanted to try something way more simple: what can one person accomplish with a single AI agent and a modest budget? I came in with five things: familiarity with the target as a practitioner, enough Python and Django knowledge to steer the agent, years of application security experience, an evening to experiment, and a $20 Claude subscription with Cyber Verification Program approval.</p>
+<hr>
+<h2 id="2-the-hypothesis">2. The hypothesis<a href="#2-the-hypothesis" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>My target is a Django-based web application enforcing a role-based access model — controlling who can see which resources, data, and system settings, at what level of detail. The access control model is the interesting surface.</p>
+<p>I asked Claude to map the REST API — URL patterns, associated models and views — and report back on any gaps in URL parameter validation. It flagged something it thought looked interesting: a parameter responsible for fetching related objects alongside the primary response. My intuition when I saw it: likely a WebUI-driven performance optimization added on top of the existing API functionality, making the authorization model a potential target for logical flaws. Features like this get tested for functionality — does it return the right data? — but access control testing of this specific path may not have received the same attention as the core endpoints. Performance shortcuts and abstraction layers are common places where authorization logic gets underspecified, because they&rsquo;re added later and the direct-endpoint tests don&rsquo;t exercise them.</p>
+<p>Whether it would lead anywhere was an open question.</p>
+<hr>
+<h2 id="3-how-the-research-ran">3. How the research ran<a href="#3-how-the-research-ran" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>From that exchange — Claude surfacing the parameter, me recognizing the authorization angle — we had a hypothesis. I asked Claude to examine how the feature works internally. It traced the relevant source files and identified the core gap: when the feature resolves a related object, no check is made against whether the requesting user is authorized to see it. The access controls on the direct API endpoints are simply not invoked in this path.</p>
+<p>From there: local Docker instance, Claude calling the application&rsquo;s own REST API with admin credentials to provision test accounts and settings, then switching to an unprivileged account to test the hypothesis. The test pattern was clean — confirm the direct endpoint returns 403, then show the same data returns through the bypass. Seeing both in the same output is unambiguous.</p>
+<p>The first two bypass paths were straightforward once the root cause was clear. I then asked Claude to think more broadly about the attack surface, prompting it to consider how Django&rsquo;s data model exposes direct and reverse object relationships. It identified three additional paths, including one through internal notes that users can mark private — the bypass returns their full content regardless, circumventing the visibility restriction the UI enforces.</p>
+<p>Five exploitable paths in total, all from the same root cause — Missing Authorization (CWE-862) across the board, with Exposure of Sensitive Information (CWE-200) sprinkled in. Network-exploitable via the REST API by an authenticated user with read permissions, accessing admin-only data. Drafted to <code>CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N</code> (4.3 Medium).</p>
+<h2 id="4-chasing-the-escalation">4. Chasing the escalation<a href="#4-chasing-the-escalation" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The core bypass came together quickly. What followed was the natural next move for any researcher: try to chain it, escalate severity, turn a Medium into something bigger. That&rsquo;s where most of the dead ends lived. Some of the vectors we tested:</p>
+<ul>
+<li>Could the bypass leak API authentication tokens (full account takeover)? Blocked.</li>
+<li>Could it be flipped into a write path? Read-only by design.</li>
+<li>Could unusual parameter values expose internal state or crash the app in a useful way? One 500 error, no data.</li>
+<li>Could object traversal chain across multiple hops to reach higher-value targets? Limited to one level.</li>
+<li>Could the attack surface extend beyond the object relationships already mapped? Explored and found nothing new reachable.</li>
+<li>Could reading related data trigger a server-side request — an SSRF via this feature would have been a significant escalation. Nope.</li>
+</ul>
+<p>Thorough analysis of every relevant code path found nothing exploitable. At some point Claude even made a comment that the codebase outside the bypass appeared well-hardened — the dead ends weren&rsquo;t just unlucky angles, they were genuinely blocked.</p>
+<p><img src="images/claude-comment.png" alt="Claude comment"></p>
+<p>The dead-end analysis likely consumed more tokens than the core bypass itself. Each candidate path required the agent to load and reason over significant amounts of source context before concluding it was blocked. At some point I made a call to stop — it was getting late, and it was clear the token burn rate on escalation paths was outpacing any realistic chance of a meaningful outcome.</p>
+<hr>
+<h2 id="5-division-of-labor">5. Division of labor<a href="#5-division-of-labor" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Across the full session, the process looked like this:</p>
+<p><img src="images/research-loop.svg" alt="Research loop diagram"></p>
+<p><strong>Target selection</strong> was mine. The application is open source with a commercial offering, backed by OWASP, and used in production by security teams — that&rsquo;s how I knew about it. Hundreds of releases and thousands of GitHub stars; it runs a HackerOne bug bounty program for many years with a good number of submissions behind it.</p>
+<p><strong>Attack surface discovery</strong> was Claude&rsquo;s. Asked to map the REST API — URL patterns, models, and views — it flagged a specific parameter as worth investigating: one responsible for fetching related objects alongside the primary response. That observation became the hypothesis we tested.</p>
+<p><strong>The hypothesis</strong> was joint. I directed the exploration and recognized why the parameter Claude surfaced was worth pursuing — that features like this tend to be undertested for authorization completeness. That judgment comes from years of looking at application security. An autonomous agent starting from scratch has no basis for it.</p>
+<p><strong>Reading and tracing source code</strong> across a large, unfamiliar codebase — holding relevant context across many files simultaneously — was Claude&rsquo;s most consistent contribution. Work that would take a human hours of careful reading took Claude minutes. That&rsquo;s where LLMs really shine.</p>
+<p><strong>Environment setup</strong> was handled by Claude directly against the live application. The agent called the target&rsquo;s own REST APIs with admin credentials to provision the test accounts and configuration needed to validate each vector — then switched to an unprivileged account to confirm the bypass. No manual setup required and it knew the APIs already from reading the codebase.</p>
+<p><strong>PoC development and live validation</strong> was Claude&rsquo;s. It wrote the test scripts, ran them against the live Docker instance, interpreted the results, diagnosed problems and iterated to completion.</p>
+<p><strong>Steering</strong> was mine throughout. When the initial finding was confirmed, I directed Claude to expand the search along a specific axis: how Django models expose object relationships, and where those traversal paths might reach objects the requesting user shouldn&rsquo;t see. That framing produced three additional bypass paths.</p>
+<p><strong>Boundary analysis</strong> was Claude&rsquo;s. When I asked whether the initial finding could be chained or escalated, Claude systematically traced each candidate path and explained whether it was viable or blocked and why.</p>
+<p><strong>Impact assessment</strong> was mine. One of the five bypass paths exposes internal security notes that teams mark private. Characterizing what that means in a real-world application requires understanding how those notes are used in practice, not just what the access model technically permits.</p>
+<p><strong>Structured reporting</strong> was Claude&rsquo;s — CVSS scores, impact analysis, affected-code tables, and remediation recommendations for all five findings in a single consolidated report, with live response examples for each confirmed vector.</p>
+<hr>
+<h2 id="6-numbers-and-disclosure">6. Numbers and disclosure<a href="#6-numbers-and-disclosure" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>What led to this session was a failed attempt with one of the open source autonomous frameworks. I pointed it at the same target, let it run, and watched it burn through 2.5 million tokens — mostly attempting to set up its own environment, failing to start the target application it didn&rsquo;t need, and exhausting its budget before reaching the actual testing phase. That experience prompted the question: what could a different approach produce?</p>
+<p>Our session — hypothesis to five confirmed findings, with live validation, dead-end analysis, and a full structured report — consumed 1.4 million tokens at a total API cost of $25. That gap is partly explained by the hypothesis: starting from a well-formed idea of where to look is a significant multiplier on what a given budget can produce. Autonomous tools trading specificity for breadth need proportionally more tokens to work through open-ended reconnaissance before they converge on anything. It&rsquo;s also worth noting that Anthropic&rsquo;s model is arguably more capable than what the open source framework was running — and more expensive per token — so the human-agent configuration does double duty: it keeps the effort targeted, and that targeting matters more when the model you&rsquo;re running costs more to use.</p>
+<p>After the core research wrapped, I asked Claude to analyze the git commit history and map when the vulnerable feature was introduced. It traced the initial commit to January 2021 — identified the exact PR that introduced it and confirmed the authorization gap was present from the start — then mapped the feature&rsquo;s expansion across subsequent releases. The finding had been in production for over five years across multiple major version milestones, including a significant expansion of the attack surface in 2023 that added it to roughly twenty additional API endpoints.</p>
+<p>I submitted the findings to the vendor&rsquo;s HackerOne bug bounty program — public, improvement-oriented, no monetary bounties. The report covered all bypass paths with confirmed live responses, CVSS scoring, and root cause analysis. A follow-up post with the full technical details will go up once the disclosure process is complete.</p>
+<hr>
+<h2 id="final-thoughts">Final thoughts<a href="#final-thoughts" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Looking at the flow diagram, the natural question is: can the human node be replaced with another autonomous agent? Yes — projects like Mythos and <a href="https://github.com/KeygraphHQ/shannon">Shannon</a> demonstrate that fully autonomous security research is viable, and companies operate at scale doing it. The cost is higher: an autonomous agent has to discover through exploration what a human researcher brings as context, and that shows up in the token count.</p>
+<p>All in all, a Medium severity authorization bypass with five confirmed network vectors, in a reasonably hardened codebase in a single evening — that&rsquo;s a good result in my book, and it took way less effort than comparable research I&rsquo;ve done solo. Happy bug hunting!</p>
+]]></content>
+		</item>
 		
 		<item>
 			<title>AI-Native Threat Modeling</title>
@@ -213,7 +300,7 @@ doesn&rsquo;t serve this purpose; a structured threat model does.</p>
 <p>The case for threat modeling doesn&rsquo;t weaken when AI writes the code — if anything,
 AI makes the security artifacts cheaper to produce, easier to keep current,
 and more consistently complete than the human-driven alternative.</p>
-<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="final-thoughts">Final thoughts<a href="#final-thoughts" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -314,7 +401,7 @@ A perimeter gate concentrates all trust decisions into one moment. Anthropic&rsq
 A perimeter gate requires the user to reason about all downstream consequences of a single click — a reasonable ask for a security engineer, not for a vibe-coder. Zero trust shifts that burden to the architecture: each capability grant is evaluated by the system, not the user.</p>
 <p>The three problems compound: the system ignores available identity signals, the gate doesn&rsquo;t compensate by informing the user what it actually grants, and the users left holding that gap aren&rsquo;t equipped to close it.</p>
 <hr>
-<h2 id="4-conclusion">4. Conclusion<a href="#4-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="final-thoughts">Final thoughts<a href="#final-thoughts" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -605,7 +692,7 @@ deeply it hooks into the agent&rsquo;s execution environment.
 Not all credential access paths are equally observable.</p>
 <p><strong>Shared machines.</strong> The low false-positive guarantee relies on the canary being invisible to legitimate users. On a machine shared by multiple developers, someone may stumble across a planted credential and use it for a real task — generating an alert that has nothing to do with a misbehaving agent. Dedicated agent environments sidestep this; shared workstations require more care.</p>
 <hr>
-<h2 id="5-conclusion">5. Conclusion<a href="#5-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -1072,7 +1159,7 @@ approach. An old technique that still holds up in the agentic age.</p>
 <p><strong>Tenant-scoped cache keys</strong> (the fix described in the companion post) also eliminate the flood attack entirely as a side effect. If each tenant&rsquo;s entries are keyed with their identity, there is no shared pool to flood — a garbage entry from attacker key A can never displace a legitimate entry from victim key B, because they exist in logically separate namespaces. This is the cleaner fix, but it requires changes to the cache key derivation that per-tenant quotas do not.</p>
 <p><strong>Defenses observed in practice.</strong> Anthropic&rsquo;s <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching">prompt caching</a> largely neutralizes any economic asymmetry in the flood attack. Cache writes are billed at a premium (1.25× base input rate for 5-minute TTL, 2× for 1-hour), so the attacker pays more per token than a normal request. There is a <strong>minimum cacheable prompt size</strong> (1024–4096 tokens depending on model), so each flood request must be substantial to even register a cache write. The net economics: the attacker pays 1.25× base input rate per flood request; each flooded victim request that misses cache pays 1.0× instead of the usual 0.1× — a 10× cost increase for the victim. The attacker&rsquo;s per-token cost is only marginally higher than the per-victim damage they cause, though the aggregate victim impact grows with victim count. In practice, sustaining enough flood volume on a managed API to matter would likely trip rate limits before the economics become interesting.</p>
 <hr>
-<h2 id="7-conclusion">7. Conclusion<a href="#7-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
@@ -1503,7 +1590,7 @@ If you&rsquo;re an engineer like me, you know the feeling — new tools, new att
    </svg></a></h3>
 <p>This attack is public — PROMPTPEEK and InputSnatch cover it thoroughly, and the PoC here adds reproducibility and a runnable verification tool without introducing a novel primitive. Nothing here requires formal coordinated disclosure, but operators of multi-tenant inference APIs who have not implemented tenant-scoped cache keys should treat this as a prompt to do so.</p>
 <hr>
-<h2 id="10-conclusion">10. Conclusion<a href="#10-conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>

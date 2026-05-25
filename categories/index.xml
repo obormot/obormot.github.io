@@ -4,11 +4,25 @@
 		<title>Categories on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/</link>
 		<description>Recent content in Categories on brain overflow</description>
-		<generator>Hugo -- 0.160.1</generator>
+		<generator>Hugo -- 0.161.1</generator>
 		<language>en-us</language>
-		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
+		<lastBuildDate>Sun, 24 May 2026 13:01:31 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/index.xml" rel="self" type="application/rss+xml" />
 		
+		
+		<item>
+			<title>Agentic Ai</title>
+			<link>https://brainoverflow.blog/categories/agentic-ai/</link>
+			<pubDate>Sun, 24 May 2026 13:01:31 -0700</pubDate><guid>https://brainoverflow.blog/categories/agentic-ai/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[]]></content>
+		</item>
+		
+		<item>
+			<title>Security Research</title>
+			<link>https://brainoverflow.blog/categories/security-research/</link>
+			<pubDate>Sun, 24 May 2026 13:01:31 -0700</pubDate><guid>https://brainoverflow.blog/categories/security-research/</guid>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[]]></content>
+		</item>
 		
 		<item>
 			<title>Ai Security</title>
@@ -56,13 +70,6 @@
 			<title>Kernel Security</title>
 			<link>https://brainoverflow.blog/categories/kernel-security/</link>
 			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://brainoverflow.blog/categories/kernel-security/</guid>
-			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[]]></content>
-		</item>
-		
-		<item>
-			<title>Research</title>
-			<link>https://brainoverflow.blog/categories/research/</link>
-			<pubDate>Sat, 02 May 2026 11:58:11 -0700</pubDate><guid>https://brainoverflow.blog/categories/research/</guid>
 			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[]]></content>
 		</item>
 		

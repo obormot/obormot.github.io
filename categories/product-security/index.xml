@@ -4,7 +4,7 @@
 		<title>Product Security on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/product-security/</link>
 		<description>Recent content in Product Security on brain overflow</description>
-		<generator>Hugo -- 0.160.1</generator>
+		<generator>Hugo -- 0.161.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/product-security/index.xml" rel="self" type="application/rss+xml" />
@@ -213,7 +213,7 @@ doesn&rsquo;t serve this purpose; a structured threat model does.</p>
 <p>The case for threat modeling doesn&rsquo;t weaken when AI writes the code — if anything,
 AI makes the security artifacts cheaper to produce, easier to keep current,
 and more consistently complete than the human-driven alternative.</p>
-<h2 id="conclusion">Conclusion<a href="#conclusion" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="final-thoughts">Final thoughts<a href="#final-thoughts" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
