@@ -14,14 +14,14 @@
 			<title>AI Assisted Bug Bounty Experiment</title>
 			<link>https://brainoverflow.blog/posts/ai-assisted-bug-bounty/</link>
 			<pubDate>Sun, 24 May 2026 13:01:31 -0700</pubDate><guid>https://brainoverflow.blog/posts/ai-assisted-bug-bounty/</guid>
-			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>Five authorization bypass paths, clean PoCs for each, full disclosure report — output of a six-hour session: one human, one Claude Code agent, an idea, and a live target in Docker. I&rsquo;ll cover the technical details in a follow-up post once the disclosure process is complete.</em></p>
+			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p><em>Five authorization bypass paths, clean PoCs for each, full disclosure report — output of a six-hour session: one human, one Claude Code agent, an idea, a repo clone, and a live target in Docker. I&rsquo;ll cover the technical details in a follow-up post once the disclosure process is complete.</em></p>
 <hr>
 <h2 id="1-the-experiment">1. The experiment<a href="#1-the-experiment" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>With the recent hype surrounding Mythos and its autonomous vulnerability discovery capabilities, the question of what AI can do for security research is hard to ignore. Most of that conversation centers on fully autonomous systems — multi-agent frameworks operating at scale with large budgets. I wanted to try something way more simple: what can one person accomplish with a single AI agent and a modest budget?</p>
+<p>With the recent hype surrounding Mythos and its autonomous vulnerability discovery capabilities, the question of what AI can do for security research is hard to ignore. Most of that conversation centers on fully autonomous systems — multi-agent frameworks operating at scale with large budgets. I wanted to try something way simpler: what can one person accomplish with a single AI agent and a modest budget?</p>
 <p>I came in with five things: familiarity with the target as a practitioner, enough Python and Django knowledge to steer the agent, years of application security experience, an evening to experiment, and a $20 Claude subscription with Cyber Verification Program approval.</p>
 <p><img src="images/image-1779751697871.png" alt="Fear and Loathing in Las Vegas (1998)">
 <em>Photo by Archive Photos/Getty Images — © 2012 Getty Images. (cropped image)</em></p>
