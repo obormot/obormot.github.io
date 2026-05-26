@@ -263,7 +263,35 @@ human bottleneck to an automatic output.</p>
 <p>This is what &ldquo;shift-left&rdquo; should actually mean: not <em>have the security team review
 earlier</em>, but <em>produce the security model at the same moment the system is designed</em>.
 The security artifact is contemporaneous with the code, not chasing it.</p>
-<h2 id="5-why-threat-modeling-still-matters">5. Why Threat Modeling Still Matters<a href="#5-why-threat-modeling-still-matters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+<h2 id="5-on-model-bias-in-security-analysis">5. On Model Bias in Security Analysis<a href="#5-on-model-bias-in-security-analysis" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>A legitimate concern about this approach is AI model bias. There&rsquo;s a well-documented
+pattern in AI-assisted security review: when a model writes code and is then asked to
+evaluate it for security in the same context window, it tends to anchor to its own design
+decisions, finding reasons why its choices are sound rather than challenging them. An
+independent reviewer operating from a fresh context — a second model, or a human who
+didn&rsquo;t write the code — is more likely to surface issues the original author missed. This
+is a real limitation, and it applies directly to using AI for code security review.</p>
+<img src="images/model-bias.png" alt="Code review vs. threat modeling under model bias" width="460" style="max-width:100%;display:block;margin:0 auto;border-radius:12px;">
+
+<p>The core distinction here is that <strong>code security review</strong> and <strong>threat modeling</strong> are quite different.
+A security review asks the model to evaluate whether its own implementation is correct and
+secure — the question where anchoring bites hardest, because the model is judging choices
+it already committed to. A threat model asks something structurally different: document the
+architecture, establish trust boundaries, map data flows and assets, then apply a framework
+like STRIDE that poses a fixed set of questions across threat categories.
+The framework is external to the code; its questions don&rsquo;t change based on how well or
+poorly the implementation is written. The question it asks — given what this system does,
+what can go wrong in each of these categories? — is answered from the architectural map,
+not from a judgment about implementation quality.</p>
+<p>What bias <em>could</em> still affect is the model&rsquo;s assessment of severity — an AI that made a
+particular design trade-off might rate the resulting risk lower than an independent reviewer
+would. That&rsquo;s a real concern, and it&rsquo;s exactly why human review of the model&rsquo;s
+outputs and assumptions is still valuable in this workflow.</p>
+<h2 id="6-why-threat-modeling-still-matters">6. Why Threat Modeling Still Matters<a href="#6-why-threat-modeling-still-matters" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
