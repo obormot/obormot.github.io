@@ -4,7 +4,7 @@
 		<title>Security Research on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/security-research/</link>
 		<description>Recent content in Security Research on brain overflow</description>
-		<generator>Hugo -- 0.161.1</generator>
+		<generator>Hugo -- 0.162.0</generator>
 		<language>en-us</language>
 		<lastBuildDate>Sun, 24 May 2026 13:01:31 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/security-research/index.xml" rel="self" type="application/rss+xml" />
@@ -229,58 +229,58 @@
 <p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
 <p>Both approaches trade some performance or compatibility for a structural guarantee that kernel CVEs in one workload cannot reach other workloads — something no amount of OS hardening on a shared-kernel architecture can provide.</p>
 <table>
-  <thead>
-      <tr>
-          <th></th>
-          <th>Container</th>
-          <th>gVisor</th>
-          <th>Firecracker</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Kernel shared</td>
-          <td>Yes</td>
-          <td>No</td>
-          <td>No</td>
-      </tr>
-      <tr>
-          <td><em>copy.fail</em> reachable</td>
-          <td>Yes</td>
-          <td>No</td>
-          <td>No</td>
-      </tr>
-      <tr>
-          <td>Boundary type</td>
-          <td>Software (seccomp)</td>
-          <td>Software (Sentry)</td>
-          <td>Hardware (KVM)</td>
-      </tr>
-      <tr>
-          <td>Host attack surface</td>
-          <td>Large</td>
-          <td>~50 syscalls</td>
-          <td>KVM + minimal VMM</td>
-      </tr>
-      <tr>
-          <td>Guest kernel</td>
-          <td>Shared host</td>
-          <td>Sentry (userspace)</td>
-          <td>Vendor-built, stripped</td>
-      </tr>
-      <tr>
-          <td>Memory overhead</td>
-          <td>~MB</td>
-          <td>~15 MB</td>
-          <td>~125 MB</td>
-      </tr>
-      <tr>
-          <td>Syscall compat</td>
-          <td>Full</td>
-          <td>Partial</td>
-          <td>Full</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th></th>
+					<th>Container</th>
+					<th>gVisor</th>
+					<th>Firecracker</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Kernel shared</td>
+					<td>Yes</td>
+					<td>No</td>
+					<td>No</td>
+			</tr>
+			<tr>
+					<td><em>copy.fail</em> reachable</td>
+					<td>Yes</td>
+					<td>No</td>
+					<td>No</td>
+			</tr>
+			<tr>
+					<td>Boundary type</td>
+					<td>Software (seccomp)</td>
+					<td>Software (Sentry)</td>
+					<td>Hardware (KVM)</td>
+			</tr>
+			<tr>
+					<td>Host attack surface</td>
+					<td>Large</td>
+					<td>~50 syscalls</td>
+					<td>KVM + minimal VMM</td>
+			</tr>
+			<tr>
+					<td>Guest kernel</td>
+					<td>Shared host</td>
+					<td>Sentry (userspace)</td>
+					<td>Vendor-built, stripped</td>
+			</tr>
+			<tr>
+					<td>Memory overhead</td>
+					<td>~MB</td>
+					<td>~15 MB</td>
+					<td>~125 MB</td>
+			</tr>
+			<tr>
+					<td>Syscall compat</td>
+					<td>Full</td>
+					<td>Partial</td>
+					<td>Full</td>
+			</tr>
+	</tbody>
 </table>
 <hr>
 <h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -426,42 +426,42 @@
 <p>4 flood threads, 60-second flood window, ~400-token garbage prompts. The victim&rsquo;s <code>SECRET_PREFIX</code> is ~619 tokens.</p>
 <p><img src="images/flood_timeline_local.png" alt="Cache flood attack timeline — local"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Phase</th>
-          <th>Victim TTFT</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Before flood (cache warm)</td>
-          <td>31 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=20s</td>
-          <td>1178 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=45s</td>
-          <td>1315 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=68s</td>
-          <td>1342 ms</td>
-      </tr>
-      <tr>
-          <td>After flood — first probe</td>
-          <td>284 ms</td>
-      </tr>
-      <tr>
-          <td>After re-prime (recovered)</td>
-          <td>33 ms</td>
-      </tr>
-      <tr>
-          <td><strong>Sustained degradation factor</strong></td>
-          <td><strong>42.8×</strong></td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Phase</th>
+					<th>Victim TTFT</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Before flood (cache warm)</td>
+					<td>31 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=20s</td>
+					<td>1178 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=45s</td>
+					<td>1315 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=68s</td>
+					<td>1342 ms</td>
+			</tr>
+			<tr>
+					<td>After flood — first probe</td>
+					<td>284 ms</td>
+			</tr>
+			<tr>
+					<td>After re-prime (recovered)</td>
+					<td>33 ms</td>
+			</tr>
+			<tr>
+					<td><strong>Sustained degradation factor</strong></td>
+					<td><strong>42.8×</strong></td>
+			</tr>
+	</tbody>
 </table>
 <p>The flood sent 110 requests in 60 seconds. The extreme degradation factor reflects both eviction and contention: llama.cpp processes requests sequentially, so 4 concurrent flood threads also act as a request queue, stacking latency on the victim&rsquo;s probes during the flood window.</p>
 <h3 id="42-vllm-0191--rtx-3090--qwen25-3b-instruct">4.2 vLLM 0.19.1 · RTX 3090 · Qwen2.5-3B-Instruct<a href="#42-vllm-0191--rtx-3090--qwen25-3b-instruct" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -472,42 +472,42 @@
 <p>Same parameters. vLLM batches requests, so flood threads contribute less queuing contention — the degradation reflects mostly cache eviction.</p>
 <p><img src="images/flood_timeline.png" alt="Cache flood attack timeline — GPU"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Phase</th>
-          <th>Victim TTFT</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Before flood (cache warm)</td>
-          <td>73 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=20s</td>
-          <td>670 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=42s</td>
-          <td>701 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=64s</td>
-          <td>582 ms</td>
-      </tr>
-      <tr>
-          <td>After flood — first probe</td>
-          <td>113 ms</td>
-      </tr>
-      <tr>
-          <td>After re-prime (recovered)</td>
-          <td>93 ms</td>
-      </tr>
-      <tr>
-          <td><strong>Sustained degradation factor</strong></td>
-          <td><strong>9.7×</strong></td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Phase</th>
+					<th>Victim TTFT</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Before flood (cache warm)</td>
+					<td>73 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=20s</td>
+					<td>670 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=42s</td>
+					<td>701 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=64s</td>
+					<td>582 ms</td>
+			</tr>
+			<tr>
+					<td>After flood — first probe</td>
+					<td>113 ms</td>
+			</tr>
+			<tr>
+					<td>After re-prime (recovered)</td>
+					<td>93 ms</td>
+			</tr>
+			<tr>
+					<td><strong>Sustained degradation factor</strong></td>
+					<td><strong>9.7×</strong></td>
+			</tr>
+	</tbody>
 </table>
 <p>The flood sent 423 requests in 60 seconds.</p>
 <p>Two effects compound during the flood. The primary effect is cache eviction: the victim&rsquo;s cached prefix blocks are displaced, forcing full cold prefill. The secondary effect is request queuing contention: flood threads compete for GPU compute. Both effects are visible in the peak reading of 701 ms — well above the 113 ms cold-miss latency measured immediately after the flood stopped. An attacker with more threads or a higher request rate would see higher contention and correspondingly higher victim TTFT.</p>
@@ -655,116 +655,116 @@
 </ul>
 <p>The five candidates:</p>
 <table>
-  <thead>
-      <tr>
-          <th>#</th>
-          <th>Candidate</th>
-          <th>Relationship to secret</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>0</td>
-          <td>Same company name, different prompt body</td>
-          <td>Near-miss</td>
-      </tr>
-      <tr>
-          <td>1</td>
-          <td>Same company, wrong escalation policy</td>
-          <td>Shallow partial match</td>
-      </tr>
-      <tr>
-          <td>2</td>
-          <td><code>SECRET_PREFIX</code></td>
-          <td>Exact match</td>
-      </tr>
-      <tr>
-          <td>3</td>
-          <td>Different company name, similar structure</td>
-          <td>Unrelated</td>
-      </tr>
-      <tr>
-          <td>4</td>
-          <td>Entirely different domain</td>
-          <td>Unrelated</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>#</th>
+					<th>Candidate</th>
+					<th>Relationship to secret</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>0</td>
+					<td>Same company name, different prompt body</td>
+					<td>Near-miss</td>
+			</tr>
+			<tr>
+					<td>1</td>
+					<td>Same company, wrong escalation policy</td>
+					<td>Shallow partial match</td>
+			</tr>
+			<tr>
+					<td>2</td>
+					<td><code>SECRET_PREFIX</code></td>
+					<td>Exact match</td>
+			</tr>
+			<tr>
+					<td>3</td>
+					<td>Different company name, similar structure</td>
+					<td>Unrelated</td>
+			</tr>
+			<tr>
+					<td>4</td>
+					<td>Entirely different domain</td>
+					<td>Unrelated</td>
+			</tr>
+	</tbody>
 </table>
 <p>All candidates padded to approximately the same token count as <code>SECRET_PREFIX</code> (~743 tokens). Why this matters is covered in Section 6.</p>
 <p><strong>Baseline (5 samples each):</strong></p>
 <p><img src="images/baseline_local.png" alt="Baseline hit vs miss TTFT distributions"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Condition</th>
-          <th>Median TTFT</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Cold miss (unique UUID prefix, never cached)</td>
-          <td>195 ms</td>
-      </tr>
-      <tr>
-          <td>Warm hit (prefix primed, then measured)</td>
-          <td>11 ms</td>
-      </tr>
-      <tr>
-          <td>Ratio</td>
-          <td><strong>17.8×</strong></td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Condition</th>
+					<th>Median TTFT</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Cold miss (unique UUID prefix, never cached)</td>
+					<td>195 ms</td>
+			</tr>
+			<tr>
+					<td>Warm hit (prefix primed, then measured)</td>
+					<td>11 ms</td>
+			</tr>
+			<tr>
+					<td>Ratio</td>
+					<td><strong>17.8×</strong></td>
+			</tr>
+	</tbody>
 </table>
 <p>The 17.8× ratio gives a detection threshold of ~97 ms (half the miss median). Any probe below that is, with high confidence, a cache hit.</p>
 <p><strong>Detection (1 probe per candidate, padded to ~743–765 tokens):</strong></p>
 <p><img src="images/detect_local.png" alt="Candidate detection results"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Candidate</th>
-          <th>Raw tokens</th>
-          <th>Norm tokens</th>
-          <th>TTFT</th>
-          <th>Classification</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>ACME near-miss, different body</td>
-          <td>148</td>
-          <td>748</td>
-          <td>268 ms</td>
-          <td>Miss</td>
-      </tr>
-      <tr>
-          <td>ACME assistant, wrong escalation policy</td>
-          <td>386</td>
-          <td>746</td>
-          <td>269 ms</td>
-          <td>Miss</td>
-      </tr>
-      <tr>
-          <td>Exact match (<code>SECRET_PREFIX</code>)</td>
-          <td>743</td>
-          <td>743</td>
-          <td><strong>45 ms</strong></td>
-          <td>Cache hit — ranked #1</td>
-      </tr>
-      <tr>
-          <td>Northwind Logistics (different company)</td>
-          <td>225</td>
-          <td>765</td>
-          <td>276 ms</td>
-          <td>Miss</td>
-      </tr>
-      <tr>
-          <td>Writing tutor, unrelated domain</td>
-          <td>146</td>
-          <td>746</td>
-          <td>268 ms</td>
-          <td>Miss</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Candidate</th>
+					<th>Raw tokens</th>
+					<th>Norm tokens</th>
+					<th>TTFT</th>
+					<th>Classification</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>ACME near-miss, different body</td>
+					<td>148</td>
+					<td>748</td>
+					<td>268 ms</td>
+					<td>Miss</td>
+			</tr>
+			<tr>
+					<td>ACME assistant, wrong escalation policy</td>
+					<td>386</td>
+					<td>746</td>
+					<td>269 ms</td>
+					<td>Miss</td>
+			</tr>
+			<tr>
+					<td>Exact match (<code>SECRET_PREFIX</code>)</td>
+					<td>743</td>
+					<td>743</td>
+					<td><strong>45 ms</strong></td>
+					<td>Cache hit — ranked #1</td>
+			</tr>
+			<tr>
+					<td>Northwind Logistics (different company)</td>
+					<td>225</td>
+					<td>765</td>
+					<td>276 ms</td>
+					<td>Miss</td>
+			</tr>
+			<tr>
+					<td>Writing tutor, unrelated domain</td>
+					<td>146</td>
+					<td>746</td>
+					<td>268 ms</td>
+					<td>Miss</td>
+			</tr>
+	</tbody>
 </table>
 <p>The exact-match candidate ranked first at ~45 ms, clearly separated from the cold-miss cluster of 268–276 ms. The miss candidates are tightly clustered because normalization brought all of them to within 20 tokens of each other.</p>
 <p>The local result confirms the PoC works, but treat the absolute numbers with some skepticism: llama.cpp is single-threaded, so concurrent requests queue and inflate miss latency; Apple Silicon&rsquo;s unified memory architecture produces different prefill timing characteristics than a discrete GPU. The vLLM replication below is the more representative data point for production inference stacks.</p>
@@ -785,71 +785,71 @@
 <p><strong>Baseline (5 samples each, prompts padded to 3,714 chars / ~619 tokens):</strong></p>
 <p><img src="images/baseline_vllm.png" alt="Baseline hit vs miss TTFT distributions"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Condition</th>
-          <th>Median TTFT</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Cold miss (unique UUID-prefixed, never cached)</td>
-          <td>120 ms</td>
-      </tr>
-      <tr>
-          <td>Warm hit (SECRET_PREFIX primed, then measured)</td>
-          <td>69 ms</td>
-      </tr>
-      <tr>
-          <td>Ratio</td>
-          <td><strong>1.75×</strong></td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Condition</th>
+					<th>Median TTFT</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Cold miss (unique UUID-prefixed, never cached)</td>
+					<td>120 ms</td>
+			</tr>
+			<tr>
+					<td>Warm hit (SECRET_PREFIX primed, then measured)</td>
+					<td>69 ms</td>
+			</tr>
+			<tr>
+					<td>Ratio</td>
+					<td><strong>1.75×</strong></td>
+			</tr>
+	</tbody>
 </table>
 <p>The 1.75× ratio is specific to this setup — available VRAM, cluster load, hardware, virtualization layer, and network latency all affect the absolute numbers. In general, the ratio will vary, and a lower ratio doesn&rsquo;t mean the attack doesn&rsquo;t work: what matters is whether the hit and miss clusters are separable, which they were in both environments tested here.</p>
 <p><strong>Detection (1 probe per candidate, candidates token-padded to ~619–636 tokens):</strong></p>
 <p><img src="images/detect_vllm.png" alt="Candidate detection results"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Candidate</th>
-          <th>Raw tokens</th>
-          <th>TTFT</th>
-          <th>Classification</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>ACME near-miss, different body</td>
-          <td>126 → 630 padded</td>
-          <td>133 ms</td>
-          <td>Miss</td>
-      </tr>
-      <tr>
-          <td>ACME assistant, wrong escalation policy</td>
-          <td>348 → 636 padded</td>
-          <td>133 ms</td>
-          <td>Miss</td>
-      </tr>
-      <tr>
-          <td>Exact match (<code>SECRET_PREFIX</code>)</td>
-          <td>619</td>
-          <td><strong>76 ms</strong></td>
-          <td>Cache hit — ranked #1</td>
-      </tr>
-      <tr>
-          <td>Northwind Logistics (different company)</td>
-          <td>194 → 626 padded</td>
-          <td>136 ms</td>
-          <td>Miss</td>
-      </tr>
-      <tr>
-          <td>Writing tutor, unrelated domain</td>
-          <td>127 → 631 padded</td>
-          <td>136 ms</td>
-          <td>Miss</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Candidate</th>
+					<th>Raw tokens</th>
+					<th>TTFT</th>
+					<th>Classification</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>ACME near-miss, different body</td>
+					<td>126 → 630 padded</td>
+					<td>133 ms</td>
+					<td>Miss</td>
+			</tr>
+			<tr>
+					<td>ACME assistant, wrong escalation policy</td>
+					<td>348 → 636 padded</td>
+					<td>133 ms</td>
+					<td>Miss</td>
+			</tr>
+			<tr>
+					<td>Exact match (<code>SECRET_PREFIX</code>)</td>
+					<td>619</td>
+					<td><strong>76 ms</strong></td>
+					<td>Cache hit — ranked #1</td>
+			</tr>
+			<tr>
+					<td>Northwind Logistics (different company)</td>
+					<td>194 → 626 padded</td>
+					<td>136 ms</td>
+					<td>Miss</td>
+			</tr>
+			<tr>
+					<td>Writing tutor, unrelated domain</td>
+					<td>127 → 631 padded</td>
+					<td>136 ms</td>
+					<td>Miss</td>
+			</tr>
+	</tbody>
 </table>
 <p>The exact-match candidate ranked first at ~76 ms, clearly separated from the cold-miss cluster of 133–136 ms. The miss candidates are tightly clustered because they are padded to nearly equal token counts with neutral filler — equalizing length is critical; a shorter cold-miss candidate prefills faster than a longer cache-hit candidate and inverts the expected ranking.</p>
 <hr>

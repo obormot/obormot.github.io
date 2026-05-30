@@ -25,26 +25,26 @@
 <meta name="theme-color" content="#494f5c">
 <meta name="msapplication-TileColor" content="#494f5c">
 
-  <meta itemprop="name" content="KV Cache Flood: DoS Against Multi-Tenant LLMs">
-  <meta itemprop="description" content="My previous post covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker’s favor.
+	<meta itemprop="name" content="KV Cache Flood: DoS Against Multi-Tenant LLMs">
+	<meta itemprop="description" content="My previous post covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker’s favor.
 TL;DR Every token prefilled by an LLM inference server can be cached. If you evict another tenant’s cached prefix, every one of their subsequent requests pays full cold-prefill cost until they re-warm it — at which point you evict it again. The attacker sends requests that generate only a single output token (near-zero compute cost) but carry long prompts that fill cache blocks. The victim pays for repeated full re-prefill at scale. On a shared RTX 3090 running vLLM, 4 flood threads caused significant TTFT degradation peaking at 9.7× within the first minute.">
-  <meta itemprop="datePublished" content="2026-04-27T01:53:01-07:00">
-  <meta itemprop="dateModified" content="2026-04-27T01:53:01-07:00">
-  <meta itemprop="wordCount" content="1914">
-  <meta itemprop="keywords" content="Security Research,Ai Security"><meta property="og:url" content="https://brainoverflow.blog/posts/kv-cache-flood-dos/">
-  <meta property="og:site_name" content="brain overflow">
-  <meta property="og:title" content="KV Cache Flood: DoS Against Multi-Tenant LLMs">
-  <meta property="og:description" content="My previous post covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker’s favor.
+	<meta itemprop="datePublished" content="2026-04-27T01:53:01-07:00">
+	<meta itemprop="dateModified" content="2026-04-27T01:53:01-07:00">
+	<meta itemprop="wordCount" content="1914">
+	<meta itemprop="keywords" content="Security Research,Ai Security"><meta property="og:url" content="https://brainoverflow.blog/posts/kv-cache-flood-dos/">
+	<meta property="og:site_name" content="brain overflow">
+	<meta property="og:title" content="KV Cache Flood: DoS Against Multi-Tenant LLMs">
+	<meta property="og:description" content="My previous post covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker’s favor.
 TL;DR Every token prefilled by an LLM inference server can be cached. If you evict another tenant’s cached prefix, every one of their subsequent requests pays full cold-prefill cost until they re-warm it — at which point you evict it again. The attacker sends requests that generate only a single output token (near-zero compute cost) but carry long prompts that fill cache blocks. The victim pays for repeated full re-prefill at scale. On a shared RTX 3090 running vLLM, 4 flood threads caused significant TTFT degradation peaking at 9.7× within the first minute.">
-  <meta property="og:locale" content="en_us">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2026-04-27T01:53:01-07:00">
-    <meta property="article:modified_time" content="2026-04-27T01:53:01-07:00">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-04-27T01:53:01-07:00">
+		<meta property="article:modified_time" content="2026-04-27T01:53:01-07:00">
 
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="KV Cache Flood: DoS Against Multi-Tenant LLMs">
-  <meta name="twitter:description" content="My previous post covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker’s favor.
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="KV Cache Flood: DoS Against Multi-Tenant LLMs">
+	<meta name="twitter:description" content="My previous post covered the KV cache timing side-channel — a known attack class, for which I built a PoC and DIY test tooling. This post covers a different application of the same shared-cache vulnerability: using cache eviction as a DoS attack against co-tenants, with cost structure which may be asymmetric in the attacker’s favor.
 TL;DR Every token prefilled by an LLM inference server can be cached. If you evict another tenant’s cached prefix, every one of their subsequent requests pays full cold-prefill cost until they re-warm it — at which point you evict it again. The attacker sends requests that generate only a single output token (near-zero compute cost) but carry long prompts that fill cache blocks. The victim pays for repeated full re-prefill at scale. On a shared RTX 3090 running vLLM, 4 flood threads caused significant TTFT degradation peaking at 9.7× within the first minute.">
 
 <script type="application/ld+json">
@@ -323,42 +323,42 @@ TL;DR Every token prefilled by an LLM inference server can be cached. If you evi
 <p>4 flood threads, 60-second flood window, ~400-token garbage prompts. The victim&rsquo;s <code>SECRET_PREFIX</code> is ~619 tokens.</p>
 <p><img src="images/flood_timeline_local.png" alt="Cache flood attack timeline — local"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Phase</th>
-          <th>Victim TTFT</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Before flood (cache warm)</td>
-          <td>31 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=20s</td>
-          <td>1178 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=45s</td>
-          <td>1315 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=68s</td>
-          <td>1342 ms</td>
-      </tr>
-      <tr>
-          <td>After flood — first probe</td>
-          <td>284 ms</td>
-      </tr>
-      <tr>
-          <td>After re-prime (recovered)</td>
-          <td>33 ms</td>
-      </tr>
-      <tr>
-          <td><strong>Sustained degradation factor</strong></td>
-          <td><strong>42.8×</strong></td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Phase</th>
+					<th>Victim TTFT</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Before flood (cache warm)</td>
+					<td>31 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=20s</td>
+					<td>1178 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=45s</td>
+					<td>1315 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=68s</td>
+					<td>1342 ms</td>
+			</tr>
+			<tr>
+					<td>After flood — first probe</td>
+					<td>284 ms</td>
+			</tr>
+			<tr>
+					<td>After re-prime (recovered)</td>
+					<td>33 ms</td>
+			</tr>
+			<tr>
+					<td><strong>Sustained degradation factor</strong></td>
+					<td><strong>42.8×</strong></td>
+			</tr>
+	</tbody>
 </table>
 <p>The flood sent 110 requests in 60 seconds. The extreme degradation factor reflects both eviction and contention: llama.cpp processes requests sequentially, so 4 concurrent flood threads also act as a request queue, stacking latency on the victim&rsquo;s probes during the flood window.</p>
 <h3 id="42-vllm-0191--rtx-3090--qwen25-3b-instruct">4.2 vLLM 0.19.1 · RTX 3090 · Qwen2.5-3B-Instruct<a href="#42-vllm-0191--rtx-3090--qwen25-3b-instruct" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -369,42 +369,42 @@ TL;DR Every token prefilled by an LLM inference server can be cached. If you evi
 <p>Same parameters. vLLM batches requests, so flood threads contribute less queuing contention — the degradation reflects mostly cache eviction.</p>
 <p><img src="images/flood_timeline.png" alt="Cache flood attack timeline — GPU"></p>
 <table>
-  <thead>
-      <tr>
-          <th>Phase</th>
-          <th>Victim TTFT</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Before flood (cache warm)</td>
-          <td>73 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=20s</td>
-          <td>670 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=42s</td>
-          <td>701 ms</td>
-      </tr>
-      <tr>
-          <td>During flood — t=64s</td>
-          <td>582 ms</td>
-      </tr>
-      <tr>
-          <td>After flood — first probe</td>
-          <td>113 ms</td>
-      </tr>
-      <tr>
-          <td>After re-prime (recovered)</td>
-          <td>93 ms</td>
-      </tr>
-      <tr>
-          <td><strong>Sustained degradation factor</strong></td>
-          <td><strong>9.7×</strong></td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th>Phase</th>
+					<th>Victim TTFT</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Before flood (cache warm)</td>
+					<td>73 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=20s</td>
+					<td>670 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=42s</td>
+					<td>701 ms</td>
+			</tr>
+			<tr>
+					<td>During flood — t=64s</td>
+					<td>582 ms</td>
+			</tr>
+			<tr>
+					<td>After flood — first probe</td>
+					<td>113 ms</td>
+			</tr>
+			<tr>
+					<td>After re-prime (recovered)</td>
+					<td>93 ms</td>
+			</tr>
+			<tr>
+					<td><strong>Sustained degradation factor</strong></td>
+					<td><strong>9.7×</strong></td>
+			</tr>
+	</tbody>
 </table>
 <p>The flood sent 423 requests in 60 seconds.</p>
 <p>Two effects compound during the flood. The primary effect is cache eviction: the victim&rsquo;s cached prefix blocks are displaced, forcing full cold prefill. The secondary effect is request queuing contention: flood threads compete for GPU compute. Both effects are visible in the peak reading of 701 ms — well above the 113 ms cold-miss latency measured immediately after the flood stopped. An attacker with more threads or a higher request rate would see higher contention and correspondingly higher victim TTFT.</p>

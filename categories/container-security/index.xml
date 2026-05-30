@@ -4,7 +4,7 @@
 		<title>Container Security on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/container-security/</link>
 		<description>Recent content in Container Security on brain overflow</description>
-		<generator>Hugo -- 0.161.1</generator>
+		<generator>Hugo -- 0.162.0</generator>
 		<language>en-us</language>
 		<lastBuildDate>Sat, 02 May 2026 11:58:11 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/container-security/index.xml" rel="self" type="application/rss+xml" />
@@ -139,58 +139,58 @@
 <p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
 <p>Both approaches trade some performance or compatibility for a structural guarantee that kernel CVEs in one workload cannot reach other workloads — something no amount of OS hardening on a shared-kernel architecture can provide.</p>
 <table>
-  <thead>
-      <tr>
-          <th></th>
-          <th>Container</th>
-          <th>gVisor</th>
-          <th>Firecracker</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Kernel shared</td>
-          <td>Yes</td>
-          <td>No</td>
-          <td>No</td>
-      </tr>
-      <tr>
-          <td><em>copy.fail</em> reachable</td>
-          <td>Yes</td>
-          <td>No</td>
-          <td>No</td>
-      </tr>
-      <tr>
-          <td>Boundary type</td>
-          <td>Software (seccomp)</td>
-          <td>Software (Sentry)</td>
-          <td>Hardware (KVM)</td>
-      </tr>
-      <tr>
-          <td>Host attack surface</td>
-          <td>Large</td>
-          <td>~50 syscalls</td>
-          <td>KVM + minimal VMM</td>
-      </tr>
-      <tr>
-          <td>Guest kernel</td>
-          <td>Shared host</td>
-          <td>Sentry (userspace)</td>
-          <td>Vendor-built, stripped</td>
-      </tr>
-      <tr>
-          <td>Memory overhead</td>
-          <td>~MB</td>
-          <td>~15 MB</td>
-          <td>~125 MB</td>
-      </tr>
-      <tr>
-          <td>Syscall compat</td>
-          <td>Full</td>
-          <td>Partial</td>
-          <td>Full</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th></th>
+					<th>Container</th>
+					<th>gVisor</th>
+					<th>Firecracker</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Kernel shared</td>
+					<td>Yes</td>
+					<td>No</td>
+					<td>No</td>
+			</tr>
+			<tr>
+					<td><em>copy.fail</em> reachable</td>
+					<td>Yes</td>
+					<td>No</td>
+					<td>No</td>
+			</tr>
+			<tr>
+					<td>Boundary type</td>
+					<td>Software (seccomp)</td>
+					<td>Software (Sentry)</td>
+					<td>Hardware (KVM)</td>
+			</tr>
+			<tr>
+					<td>Host attack surface</td>
+					<td>Large</td>
+					<td>~50 syscalls</td>
+					<td>KVM + minimal VMM</td>
+			</tr>
+			<tr>
+					<td>Guest kernel</td>
+					<td>Shared host</td>
+					<td>Sentry (userspace)</td>
+					<td>Vendor-built, stripped</td>
+			</tr>
+			<tr>
+					<td>Memory overhead</td>
+					<td>~MB</td>
+					<td>~15 MB</td>
+					<td>~125 MB</td>
+			</tr>
+			<tr>
+					<td>Syscall compat</td>
+					<td>Full</td>
+					<td>Partial</td>
+					<td>Full</td>
+			</tr>
+	</tbody>
 </table>
 <hr>
 <h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

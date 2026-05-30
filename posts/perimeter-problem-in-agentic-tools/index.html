@@ -25,26 +25,26 @@
 <meta name="theme-color" content="#494f5c">
 <meta name="msapplication-TileColor" content="#494f5c">
 
-  <meta itemprop="name" content="TrustFall: The Perimeter Problem in Agentic Tools">
-  <meta itemprop="description" content="On May 7, 2026, Adversa AI published TrustFall — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click “Yes, I trust this folder”, and an attacker-controlled process runs with your full OS privileges.
+	<meta itemprop="name" content="TrustFall: The Perimeter Problem in Agentic Tools">
+	<meta itemprop="description" content="On May 7, 2026, Adversa AI published TrustFall — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click “Yes, I trust this folder”, and an attacker-controlled process runs with your full OS privileges.
 Anthropic declined the finding as outside their threat model and the behavior as functioning by design. This post digs into that response — and argues that the core issue is architectural: a perimeter security model that can’t carry the weight placed on it, and that makes the vulnerability structurally hard to surface through threat modeling. It looks at what a zero trust alternative would look like for agentic tools.">
-  <meta itemprop="datePublished" content="2026-05-18T10:00:00-07:00">
-  <meta itemprop="dateModified" content="2026-05-18T10:00:00-07:00">
-  <meta itemprop="wordCount" content="1308">
-  <meta itemprop="keywords" content="Ai Security,Security Architecture,Threat Modeling"><meta property="og:url" content="https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/">
-  <meta property="og:site_name" content="brain overflow">
-  <meta property="og:title" content="TrustFall: The Perimeter Problem in Agentic Tools">
-  <meta property="og:description" content="On May 7, 2026, Adversa AI published TrustFall — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click “Yes, I trust this folder”, and an attacker-controlled process runs with your full OS privileges.
+	<meta itemprop="datePublished" content="2026-05-18T10:00:00-07:00">
+	<meta itemprop="dateModified" content="2026-05-18T10:00:00-07:00">
+	<meta itemprop="wordCount" content="1308">
+	<meta itemprop="keywords" content="Ai Security,Security Architecture,Threat Modeling"><meta property="og:url" content="https://brainoverflow.blog/posts/perimeter-problem-in-agentic-tools/">
+	<meta property="og:site_name" content="brain overflow">
+	<meta property="og:title" content="TrustFall: The Perimeter Problem in Agentic Tools">
+	<meta property="og:description" content="On May 7, 2026, Adversa AI published TrustFall — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click “Yes, I trust this folder”, and an attacker-controlled process runs with your full OS privileges.
 Anthropic declined the finding as outside their threat model and the behavior as functioning by design. This post digs into that response — and argues that the core issue is architectural: a perimeter security model that can’t carry the weight placed on it, and that makes the vulnerability structurally hard to surface through threat modeling. It looks at what a zero trust alternative would look like for agentic tools.">
-  <meta property="og:locale" content="en_us">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2026-05-18T10:00:00-07:00">
-    <meta property="article:modified_time" content="2026-05-18T10:00:00-07:00">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-05-18T10:00:00-07:00">
+		<meta property="article:modified_time" content="2026-05-18T10:00:00-07:00">
 
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="TrustFall: The Perimeter Problem in Agentic Tools">
-  <meta name="twitter:description" content="On May 7, 2026, Adversa AI published TrustFall — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click “Yes, I trust this folder”, and an attacker-controlled process runs with your full OS privileges.
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="TrustFall: The Perimeter Problem in Agentic Tools">
+	<meta name="twitter:description" content="On May 7, 2026, Adversa AI published TrustFall — a one-click remote code execution in Claude Code, with variants across Gemini CLI, Cursor, and GitHub Copilot: clone a repository, open it, click “Yes, I trust this folder”, and an attacker-controlled process runs with your full OS privileges.
 Anthropic declined the finding as outside their threat model and the behavior as functioning by design. This post digs into that response — and argues that the core issue is architectural: a perimeter security model that can’t carry the weight placed on it, and that makes the vulnerability structurally hard to surface through threat modeling. It looks at what a zero trust alternative would look like for agentic tools.">
 
 <script type="application/ld+json">

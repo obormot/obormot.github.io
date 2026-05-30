@@ -4,7 +4,7 @@
 		<title>Product Security on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/product-security/</link>
 		<description>Recent content in Product Security on brain overflow</description>
-		<generator>Hugo -- 0.161.1</generator>
+		<generator>Hugo -- 0.162.0</generator>
 		<language>en-us</language>
 		<lastBuildDate>Wed, 20 May 2026 11:29:02 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/product-security/index.xml" rel="self" type="application/rss+xml" />
@@ -308,7 +308,7 @@ but only if the security team&rsquo;s role evolves with it.</p>
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>Everything flows from business risk. Vulnerabilities, architecture gaps, compliance requirements — they&rsquo;re all risks to be scored, prioritized, and decided on, and they belong in a risk register that the business actually owns — and part of the security team&rsquo;s job is ensuring it does. Not a document security maintains in isolation, but a living record that business owners understand, contribute to, and sign off on.</p>
+<p>Everything flows from business risk: vulnerabilities, architecture gaps, compliance requirements are all risks to be scored, prioritized, and decided on. They belong in a risk register that the business actually owns, and part of the security team&rsquo;s job is ensuring it does: it should be a living record that business owners understand, contribute to, and sign off on, not a document security maintains in isolation.</p>
 <p><strong>Proactive and continuous risk reduction</strong> is how I formulate the security team&rsquo;s mission.</p>
 <h2 id="2-frame-risk-in-business-terms">2. Frame risk in business terms<a href="#2-frame-risk-in-business-terms" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
@@ -317,29 +317,32 @@ but only if the security team&rsquo;s role evolves with it.</p>
    </svg></a></h2>
 <p>A CVSS score means nothing to an executive. A risk item must answer: what&rsquo;s the realistic scenario, what does it cost if it happens, what does it cost to fix, what&rsquo;s your recommendation? When security decisions carry significant business risk, frame them in business language.</p>
 <p>Seek explicit executive sign-off for security exceptions and risks above a materiality threshold — it moves accountability to where the decision lives.</p>
-<p><strong>Risk = Severity × Potential Impact</strong> — the key formula that turns a vulnerability into a business decision.</p>
+<p><strong>Risk = Severity × Likelihood</strong>: the key formula that turns a vulnerability into a business decision.</p>
+<blockquote>
+<p><strong>UPD 5/30:</strong> A reader pointed out that my original formula (<em>Risk = Severity × Potential Impact</em>) was incorrect; it conflated severity and potential impact (which represent the same measurement), and missed the likelihood completely. I&rsquo;ve updated the post with the correct formula above.</p>
+</blockquote>
 <h2 id="3-security-architecture">3. Security Architecture<a href="#3-security-architecture" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>A whiteboard conversation at design time costs an hour. A redesign after implementation costs a sprint. Security belongs at the beginning of the design process, not at the end as a gate. The goal is to be the person engineers call when they&rsquo;re designing, not when they&rsquo;re shipping.</p>
-<p>Don&rsquo;t overthink threat modeling. Formal frameworks have their place, but if the overhead of the methodology is slowing teams down, drop it. A napkin sketch of trust boundaries and a list of &ldquo;what could go wrong&rdquo; is a threat model. An imperfect one done at design time beats a rigorous one that never happens.</p>
-<p>Good security architecture is transparent. Document it publicly — it builds trust, and it&rsquo;s the right counterweight to security through obscurity. If the design is sound, exposure doesn&rsquo;t weaken it. If your code ever leaks, there should be no secrets in it worth finding.</p>
+<p>A whiteboard conversation at design time costs an hour; a redesign after implementation costs a sprint. Security belongs at the beginning of the design process, not at the end as a gate. The goal is to be the person engineers call when they&rsquo;re designing, not when they&rsquo;re shipping.</p>
+<p>Don&rsquo;t overthink threat modeling; formal frameworks have their place, but if the overhead of the methodology is slowing teams down, drop it. A napkin sketch of trust boundaries and a list of &ldquo;what could go wrong&rdquo; is a threat model, an imperfect one done at design time beats a rigorous one that never happens.</p>
+<p>Good security architecture is transparent. Document it publicly; it builds trust and is the right counterweight to security through obscurity. If the design is sound, exposure doesn&rsquo;t weaken it. If your code ever leaks, there should be no secrets in it worth finding.</p>
 <h2 id="4-assume-controls-fail--design-and-test-for-it">4. Assume controls fail — design and test for it<a href="#4-assume-controls-fail--design-and-test-for-it" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>The operating posture is proactive, not reactive — find the gaps before an attacker or a customer does. No single control holds forever. The question after every architectural decision is: when this fails, what&rsquo;s the worst reachable outcome? Isolation, least privilege, and short-lived credentials aren&rsquo;t redundancy — they&rsquo;re blast radius reduction. Treat defense in depth as a system property.</p>
-<p>Designing for failure isn&rsquo;t enough — validate that your controls actually perform as designed. Security audits, red and purple team exercises, and bug bounty program all serve the same function: actively probing your own assumptions.</p>
+<p>The operating posture is proactive, not reactive. Find the gaps before an attacker or a customer does. No single control holds forever: when this fails, what&rsquo;s the worst reachable outcome? Isolation, least privilege, and short-lived credentials aren&rsquo;t redundancy, they&rsquo;re blast radius reduction. Treat defense in depth as a system property.</p>
+<p>Designing for failure isn&rsquo;t enough — validate that your controls actually perform as designed. Security audits, red and purple team exercises, and bug bounty programs all serve the same function: actively probing your own assumptions.</p>
 <h2 id="5-friction-is-the-enemy">5. Friction is the enemy<a href="#5-friction-is-the-enemy" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>Culture is a big one. Most engineers want to build secure software — they&rsquo;re just operating under deadlines, competing priorities, and finite cognitive bandwidth. When security loses, it&rsquo;s usually not because engineers don&rsquo;t care; it&rsquo;s because the secure path was harder than it needed to be, or they simply didn&rsquo;t know what it was. Security expertise isn&rsquo;t a given — engineers are experts in their domain, not ours.</p>
-<p>Every process, template, and gate should make the secure choice the default, not the tax. Security has to live inside the workflows engineers already use — a separate system they have to visit is a system that will fail adoption. Friction reduction is the mechanism; the goal is cultural — security becoming a natural part of how the team ships.</p>
+<p>Culture is a big one. Most engineers <em>want</em> to build secure software — they&rsquo;re just operating under deadlines, competing priorities, and finite cognitive bandwidth. When security loses, it&rsquo;s usually not because engineers don&rsquo;t care; it&rsquo;s because the secure path was harder than it needed to be, or they simply didn&rsquo;t know what it was. Security expertise isn&rsquo;t a given — engineers are experts in their domain, not ours.</p>
+<p>Every process, template, and gate should make the secure choice the default, not the tax. Security has to live inside the workflows engineers already use. A separate system they have to visit is a system that will fail adoption. Friction reduction is the mechanism; the goal is cultural: security becoming a natural part of how the team ships.</p>
 <h2 id="6-influence-over-formal-authority">6. Influence over formal authority<a href="#6-influence-over-formal-authority" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
@@ -352,7 +355,7 @@ but only if the security team&rsquo;s role evolves with it.</p>
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
-<p>Competing with engineering for resources — security work versus features on the roadmap — comes with the territory. That tension is structural and it never fully goes away. Recognizing it as part of the job is healthy; letting it harden into an us-versus-them mentality is not. Security and engineering look at the same problems from different angles, but there is one goal: ship secure software. Learn each other&rsquo;s stack, understand the roadmap, show up as a collaborator rather than a reviewer. The security team engineers want to call is more effective than the one they&rsquo;re required to consult.</p>
+<p>Competing with engineering for resources — security work versus features on the roadmap — comes with the territory. That tension is structural and it never fully goes away. Recognize it as part of the job; the risk is letting it harden into an us-versus-them mentality that undermines collaboration. Security and engineering look at the same problems from different angles, but there is one goal: ship secure software. Learn each other&rsquo;s stack, understand the roadmap, show up as a collaborator rather than a reviewer. The security team engineers want to call is more effective than the one they&rsquo;re required to consult.</p>
 <h2 id="8-know-when-to-stand-down--and-when-to-push-back">8. Know when to stand down — and when to push back<a href="#8-know-when-to-stand-down--and-when-to-push-back" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
       <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
@@ -389,10 +392,10 @@ but only if the security team&rsquo;s role evolves with it.</p>
       <line x1="8" y1="12" x2="16" y2="12"></line>
    </svg></a></h2>
 <p>Security&rsquo;s value is counterfactual by design. You&rsquo;re selling the absence of bad outcomes, which is invisible until it isn&rsquo;t. The &ldquo;we didn&rsquo;t get hacked — why do we even need a security team?&rdquo; question is a predictable trap. When things are quiet, there&rsquo;s nothing visible to point to; when something goes wrong, the case for security makes itself — but at too high a cost.</p>
-<p>The measurement gap is real — work around it. SLA compliance, MTTR, vulnerability age, findings caught pre-production are useful signals, but proxies for value, not proof of it. Tell the risk reduction story proactively: here&rsquo;s what we found before it became a breach, here&rsquo;s how the attack surface changed over the past year, here&rsquo;s what we closed before a researcher or an attacker got there first.</p>
+<p>The measurement gap is real — work around it. SLA compliance, MTTR, vulnerability age, findings caught pre-production are useful signals. Tell the risk reduction story proactively: here&rsquo;s what we found before it became a breach, here&rsquo;s how the attack surface changed over the past year, here&rsquo;s what we closed before a researcher or an attacker got there first.</p>
 <p>Security that only shows up in the numbers after an incident has already lost the framing war — and ironically, that&rsquo;s often when companies make their first Product Security hire.</p>
 <hr>
-<p>Done well, product security is invisible: engineers ship without friction, teams collaborate without tension, and executives make informed decisions without needing a crisis to focus them. Getting there is a journey — but not an impossible one.</p>
+<p>Done well, product security is invisible: engineers ship without friction, teams collaborate without tension, and executives make informed decisions without needing a crisis to focus them. Getting there is a journey, but not an impossible one.</p>
 ]]></content>
 		</item>
 		

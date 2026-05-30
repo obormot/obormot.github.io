@@ -25,27 +25,27 @@
 <meta name="theme-color" content="#494f5c">
 <meta name="msapplication-TileColor" content="#494f5c">
 
-  <meta itemprop="name" content="copy.fail: From kernel CVE to Kubernetes Container Escape">
-  <meta itemprop="description" content="My previous posts looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other’s data and starve each other’s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.">
-  <meta itemprop="datePublished" content="2026-05-02T11:58:11-07:00">
-  <meta itemprop="dateModified" content="2026-05-02T11:58:11-07:00">
-  <meta itemprop="wordCount" content="2080">
-  <meta itemprop="image" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/images/page-cache-anniversary.jpg">
-  <meta itemprop="keywords" content="Security Research,Kernel Security,Container Security"><meta property="og:url" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/">
-  <meta property="og:site_name" content="brain overflow">
-  <meta property="og:title" content="copy.fail: From kernel CVE to Kubernetes Container Escape">
-  <meta property="og:description" content="My previous posts looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other’s data and starve each other’s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.">
-  <meta property="og:locale" content="en_us">
-  <meta property="og:type" content="article">
-    <meta property="article:section" content="posts">
-    <meta property="article:published_time" content="2026-05-02T11:58:11-07:00">
-    <meta property="article:modified_time" content="2026-05-02T11:58:11-07:00">
-    <meta property="og:image" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/images/page-cache-anniversary.jpg">
+	<meta itemprop="name" content="copy.fail: From kernel CVE to Kubernetes Container Escape">
+	<meta itemprop="description" content="My previous posts looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other’s data and starve each other’s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.">
+	<meta itemprop="datePublished" content="2026-05-02T11:58:11-07:00">
+	<meta itemprop="dateModified" content="2026-05-02T11:58:11-07:00">
+	<meta itemprop="wordCount" content="2080">
+	<meta itemprop="image" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/images/page-cache-anniversary.jpg">
+	<meta itemprop="keywords" content="Security Research,Kernel Security,Container Security"><meta property="og:url" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/">
+	<meta property="og:site_name" content="brain overflow">
+	<meta property="og:title" content="copy.fail: From kernel CVE to Kubernetes Container Escape">
+	<meta property="og:description" content="My previous posts looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other’s data and starve each other’s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-05-02T11:58:11-07:00">
+		<meta property="article:modified_time" content="2026-05-02T11:58:11-07:00">
+		<meta property="og:image" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/images/page-cache-anniversary.jpg">
 
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/images/page-cache-anniversary.jpg">
-  <meta name="twitter:title" content="copy.fail: From kernel CVE to Kubernetes Container Escape">
-  <meta name="twitter:description" content="My previous posts looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other’s data and starve each other’s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:image" content="https://brainoverflow.blog/posts/copy-fail-kubernetes-escape/images/page-cache-anniversary.jpg">
+	<meta name="twitter:title" content="copy.fail: From kernel CVE to Kubernetes Container Escape">
+	<meta name="twitter:description" content="My previous posts looked at what happens when a shared object — the LLM KV cache — has no per-tenant namespace: co-tenants can read each other’s data and starve each other’s resources. Coincidentally, the newly dropped CVE-2026-31431 (copy.fail) is the same pattern at a lower layer. The shared object is the Linux page cache (yup, a cache again!). The co-tenants are Kubernetes pods. The isolation boundary that does not exist is the host kernel.">
 
 <script type="application/ld+json">
 {
@@ -333,58 +333,58 @@
 <p><strong>MicroVMs (<a href="https://firecracker-microvm.github.io/">Firecracker</a>).</strong> Firecracker runs each workload inside a lightweight virtual machine with its own kernel — typically adding only ~125ms to cold start with negligible steady-state overhead. The page cache is per-VM; it cannot cross VM boundaries. A copy.fail exploit in one VM writes into that VM&rsquo;s private kernel memory and goes no further. The host kernel and all other workloads are unaffected. Firecracker is the runtime behind AWS Lambda and Fargate.</p>
 <p>Both approaches trade some performance or compatibility for a structural guarantee that kernel CVEs in one workload cannot reach other workloads — something no amount of OS hardening on a shared-kernel architecture can provide.</p>
 <table>
-  <thead>
-      <tr>
-          <th></th>
-          <th>Container</th>
-          <th>gVisor</th>
-          <th>Firecracker</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Kernel shared</td>
-          <td>Yes</td>
-          <td>No</td>
-          <td>No</td>
-      </tr>
-      <tr>
-          <td><em>copy.fail</em> reachable</td>
-          <td>Yes</td>
-          <td>No</td>
-          <td>No</td>
-      </tr>
-      <tr>
-          <td>Boundary type</td>
-          <td>Software (seccomp)</td>
-          <td>Software (Sentry)</td>
-          <td>Hardware (KVM)</td>
-      </tr>
-      <tr>
-          <td>Host attack surface</td>
-          <td>Large</td>
-          <td>~50 syscalls</td>
-          <td>KVM + minimal VMM</td>
-      </tr>
-      <tr>
-          <td>Guest kernel</td>
-          <td>Shared host</td>
-          <td>Sentry (userspace)</td>
-          <td>Vendor-built, stripped</td>
-      </tr>
-      <tr>
-          <td>Memory overhead</td>
-          <td>~MB</td>
-          <td>~15 MB</td>
-          <td>~125 MB</td>
-      </tr>
-      <tr>
-          <td>Syscall compat</td>
-          <td>Full</td>
-          <td>Partial</td>
-          <td>Full</td>
-      </tr>
-  </tbody>
+	<thead>
+			<tr>
+					<th></th>
+					<th>Container</th>
+					<th>gVisor</th>
+					<th>Firecracker</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Kernel shared</td>
+					<td>Yes</td>
+					<td>No</td>
+					<td>No</td>
+			</tr>
+			<tr>
+					<td><em>copy.fail</em> reachable</td>
+					<td>Yes</td>
+					<td>No</td>
+					<td>No</td>
+			</tr>
+			<tr>
+					<td>Boundary type</td>
+					<td>Software (seccomp)</td>
+					<td>Software (Sentry)</td>
+					<td>Hardware (KVM)</td>
+			</tr>
+			<tr>
+					<td>Host attack surface</td>
+					<td>Large</td>
+					<td>~50 syscalls</td>
+					<td>KVM + minimal VMM</td>
+			</tr>
+			<tr>
+					<td>Guest kernel</td>
+					<td>Shared host</td>
+					<td>Sentry (userspace)</td>
+					<td>Vendor-built, stripped</td>
+			</tr>
+			<tr>
+					<td>Memory overhead</td>
+					<td>~MB</td>
+					<td>~15 MB</td>
+					<td>~125 MB</td>
+			</tr>
+			<tr>
+					<td>Syscall compat</td>
+					<td>Full</td>
+					<td>Partial</td>
+					<td>Full</td>
+			</tr>
+	</tbody>
 </table>
 <hr>
 <h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
