@@ -1,13 +1,19 @@
 import os
-import anthropic
+import json
+import re
+from openai import OpenAI
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-client = anthropic.Anthropic()
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.environ["OPENROUTER_API_KEY"],
+)
+
+MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 
 BASE_DIR = os.path.realpath(os.path.dirname(__file__))
-
-import re
 
 def validate_personality(value):
     """Validate personality input: non-empty, length-limited, no HTML injection."""
@@ -27,25 +33,31 @@ Your personality: """  # personality appended separately, not via format()
 
 TOOLS = [
     {
-        "name": "read_file",
-        "description": "Read the contents of a file",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Path to the file to read"}
-            },
-            "required": ["path"]
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the contents of a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to the file to read"}
+                },
+                "required": ["path"]
+            }
         }
     },
     {
-        "name": "list_dir",
-        "description": "List contents of a directory",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Directory path to list"}
-            },
-            "required": ["path"]
+        "type": "function",
+        "function": {
+            "name": "list_dir",
+            "description": "List contents of a directory",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Directory path to list"}
+                },
+                "required": ["path"]
+            }
         }
     }
 ]
@@ -62,6 +74,7 @@ def handle_tool_call(tool_name, tool_input):
             return f.read()
     elif tool_name == "list_dir":
         return "\n".join(os.listdir(safe_path(tool_input["path"])))
+    return "Unknown tool"
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -73,28 +86,38 @@ def chat():
 
     system = BASE_SYSTEM_PROMPT + personality
 
-    messages = [{"role": "user", "content": user_message}]
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_message},
+    ]
 
     while True:
-        response = client.messages.create(
-            model="claude-opus-4-7",
-            max_tokens=1024,
-            system=system,
+        print(f"[DEBUG] Sending {len(messages)} messages to model", flush=True)
+        response = client.chat.completions.create(
+            model=MODEL,
             tools=TOOLS,
             messages=messages,
         )
+        print(f"[DEBUG] stop_reason={response.choices[0].finish_reason}", flush=True)
 
-        if response.stop_reason == "end_turn":
-            text = next(b.text for b in response.content if hasattr(b, "text"))
-            return jsonify({"response": text})
+        msg = response.choices[0].message
+        print(f"[DEBUG] content={msg.content!r}", flush=True)
+        print(f"[DEBUG] tool_calls={msg.tool_calls}", flush=True)
 
-        tool_use = next(b for b in response.content if b.type == "tool_use")
-        tool_result = handle_tool_call(tool_use.name, tool_use.input)
+        if not msg.tool_calls:
+            return jsonify({"response": msg.content})
 
-        messages.append({"role": "assistant", "content": response.content})
+        tool_call = msg.tool_calls[0]
+        tool_input = json.loads(tool_call.function.arguments)
+        print(f"[DEBUG] tool={tool_call.function.name} input={tool_input}", flush=True)
+        tool_result = handle_tool_call(tool_call.function.name, tool_input)
+        print(f"[DEBUG] tool_result={tool_result[:200]!r}", flush=True)
+
+        messages.append(msg)
         messages.append({
-            "role": "user",
-            "content": [{"type": "tool_result", "tool_use_id": tool_use.id, "content": tool_result}]
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": tool_result,
         })
 
 if __name__ == "__main__":
