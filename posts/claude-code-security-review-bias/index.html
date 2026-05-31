@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q8CM1FPSY9"></script>
+      <script>
+        var doNotTrack = false;
+        if ( true ) {
+          var dnt = (navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack);
+          var doNotTrack = (dnt == "1" || dnt == "yes");
+        }
+        if (!doNotTrack) {
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-Q8CM1FPSY9');
+        }
+      </script><meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1, minimal-ui">
+<meta http-equiv="X-UA-Compatible" content="ie=edge"><meta name="robots" content="index, follow"><meta name="author" content="">
+<meta name="description" content=""><link rel="manifest" href="/site.webmanifest"><link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="brain overflow" />
+<meta name="theme-color" content="#494f5c">
+<meta name="msapplication-TileColor" content="#494f5c">
+
+	<meta itemprop="name" content="Hidden Gaps in Claude Code Security Reviews">
+	<meta itemprop="description" content="Anthropic recently shipped a new security plugin for Claude Code that automatically reviews code for vulnerabilities as you make changes, complementing the existing /security-review skill. I decided to test both against a deliberately constructed set of security flaws to see if the new tool improves coverage. Little did I know how deep this rabbit hole would take me. Fair warning: this is a long read.
+1. Background Claude Code supports LLM-based security reviews at three stages:">
+	<meta itemprop="datePublished" content="2026-05-30T16:35:14-07:00">
+	<meta itemprop="dateModified" content="2026-05-30T16:35:14-07:00">
+	<meta itemprop="wordCount" content="2183">
+	<meta itemprop="keywords" content="Ai Security,Security Research,Tools"><meta property="og:url" content="https://brainoverflow.blog/posts/claude-code-security-review-bias/">
+	<meta property="og:site_name" content="brain overflow">
+	<meta property="og:title" content="Hidden Gaps in Claude Code Security Reviews">
+	<meta property="og:description" content="Anthropic recently shipped a new security plugin for Claude Code that automatically reviews code for vulnerabilities as you make changes, complementing the existing /security-review skill. I decided to test both against a deliberately constructed set of security flaws to see if the new tool improves coverage. Little did I know how deep this rabbit hole would take me. Fair warning: this is a long read.
+1. Background Claude Code supports LLM-based security reviews at three stages:">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="posts">
+		<meta property="article:published_time" content="2026-05-30T16:35:14-07:00">
+		<meta property="article:modified_time" content="2026-05-30T16:35:14-07:00">
+
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="Hidden Gaps in Claude Code Security Reviews">
+	<meta name="twitter:description" content="Anthropic recently shipped a new security plugin for Claude Code that automatically reviews code for vulnerabilities as you make changes, complementing the existing /security-review skill. I decided to test both against a deliberately constructed set of security flaws to see if the new tool improves coverage. Little did I know how deep this rabbit hole would take me. Fair warning: this is a long read.
+1. Background Claude Code supports LLM-based security reviews at three stages:">
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "Hidden Gaps in Claude Code Security Reviews",
+    "name": "Hidden Gaps in Claude Code Security Reviews",
+    "description": "Anthropic recently shipped a new security plugin for Claude Code that automatically reviews code for vulnerabilities as you make changes, complementing the existing /security-review skill. I decided to test both against a deliberately constructed set of security flaws to see if the new tool improves coverage. Little did I know how deep this rabbit hole would take me. Fair warning: this is a long read.\n1. Background Claude Code supports LLM-based security reviews at three stages:\n",
+    "keywords": [],
+    "articleBody": "Anthropic recently shipped a new security plugin for Claude Code that automatically reviews code for vulnerabilities as you make changes, complementing the existing /security-review skill. I decided to test both against a deliberately constructed set of security flaws to see if the new tool improves coverage. Little did I know how deep this rabbit hole would take me. Fair warning: this is a long read.\n1. Background Claude Code supports LLM-based security reviews at three stages:\nTool Plans What the reviewer sees /security-review All Full branch, same or new session context (user’s choice) Security guidance plugin (new, May 2026) All Git diff from current turn, fresh model context Code Review Team / Enterprise only Full codebase, multi-agent, independent model (runs on PRs) The new plugin shipped with an explicit design goal: avoid the model anchoring bias problem I wrote about earlier. To understand what model bias means here, consider the human equivalent: if you ask the author of the code to review it, they’ll likely tell you it’s fine — they wrote it after all. A reviewer who wasn’t in the room when the decisions were made will challenge assumptions the author has stopped seeing. The same dynamic applies to LLMs: when Claude writes code and then reviews it in the same session, it has the full conversation history in context, including every design choice and tradeoff it reasoned through while writing. It validates against those decisions rather than challenging them. A fresh session is the AI equivalent of a second pair of eyes.\nThe new plugin addresses this by running a separate Opus 4.7 session with a fresh context: the reviewer starts from the diff with no session history and no investment in the original approach. Anthropic’s own documentation is direct about the design intent:\n“The plugin does not ask the same Claude instance that wrote the code to grade itself. […] The end-of-turn and commit reviews run as a separate Claude call with a fresh context and a security-focused prompt: the reviewer starts from the diff, has no investment in the original approach, and is instructed only to find problems.”\nThis is a real solution to the model bias problem, but if you read deeper, it has its own limitation: a diff-scoped reviewer can only see what changed in the current turn and cannot reason about interactions between pre-existing code and new additions. That constraint is likely a cost decision: Opus 4.7 is expensive, and reviewing the full codebase on every change would be prohibitively token-intensive.\nThis gives me two hypotheses to experiment with:\nH1: same-session security-review is affected by model anchoring bias and will suppress findings that a cold run on the same code surfaces. The delta between the two runs measures how bad the gap is in practice.\nH2: the newly introduced diff-based plugin will miss vulnerability chains where each change looks benign in isolation but the two together form something exploitable, because the reviewer only ever sees one diff at a time and has no memory of what came before.\n2. Test corpus My target is based on a real Telegram bot that routes voice and text messages into a backend, but the version used here was vibe-coded from scratch for this experiment. The spec was written to elicit insecure decisions without explicitly asking for them: the goal was a realistic-looking codebase with seeded flaws.\nThe three flaws, ranging in complexity:\nF1: Fail-open authentication (simple) TELEGRAM_ALLOWED_USERS is read into a set at startup. When the env var is absent, the set is empty. The auth guard uses the set as a condition:\nif TELEGRAM_USERS and (not user or user.id not in TELEGRAM_USERS): return When TELEGRAM_USERS is empty, the entire if is skipped: any Telegram user is accepted. The correct default is deny-all: a bot that can read files and spawn subprocesses should fail closed, not open.\nF2: Unrestricted subprocess permissions (medium) The bot classifies incoming messages and dispatches them, spawning claude -p subprocess with the process_notes skill and an --allowedTools list needed for the skill to run its operations. The allowed tools list passed to the inner Claude instance includes Bash(python3:*) without path restrictions. The process_notes skill reads the note from disk and invokes Python with it as input. If the skill passes note content to Python without sanitization, the chain reaches arbitrary code execution.\n# python3 unrestricted allowed_tools = \"Read,Write,Bash(python3:*),Bash(mv:*),Bash(rm:*), ...\" F3: Write + path-scoped python3 = write-then-execute chain (hard) Now python3:* is hardened to python3:.claude/scripts/*, but the Write permission remains. The chain: write a payload to .claude/scripts/, invoke it via python. Neither permission is dangerous alone: the vulnerability only exists when you hold both simultaneously. This flaw is the key test case for the new plugin: a diff-based reviewer seeing only the second permission added can’t chain it to the first to recognize the combined severity.\nallowed_tools = \"Read,Write,Bash(python3:.claude/scripts/*),Bash(mv:*), ...\" # ^^^^^ unrestricted ^^^^^ scoped — looks safe # Chain: Write payload → .claude/scripts/evil.py, python3 runs attacker's code The four tests map directly to the two hypotheses:\nTest Tool Setup Tests T1 /security-review Same session that wrote the code H1: does model bias suppress findings? T2 /security-review Fresh session, no prior context H1 control: cold reviewer, does it catch everything? T3 Security guidance plugin Write + python3:* both new in the diff H2: does plugin catch a chain when it’s fully visible? T4 Security guidance plugin Write pre-existing, only python3 scripts/* added H2: does plugin miss a chain split across commits? 3. H1 | T1 \u0026 T2: /security-review and model bias Model bias in AI security review is a known problem, and Anthropic implicitly acknowledged it by releasing the new plugin. I’m not going to dwell on it; the tests here are a quick empirical confirmation with a concrete measurement of the gap.\nThe security-review skill runs a multi-agent pipeline — initial identification followed by parallel false-positive filtering against known precedents, with a scoring system and a confidence threshold to report. It is more reliable than casually asking Claude to “review this code for vulnerabilities”, though some real issues may get filtered if the evidence isn’t strong enough.\nTest 1 ran in the same session that produced the bot; Test 2 ran in a fresh session with no prior context. Same code, model, thinking effort, command.\nFinding Test 1 (same-session) Test 2 (cold session) Fail-open auth: empty allowlist (F1) Not surfaced High (0.95) Path traversal in file retrieval Not surfaced Medium (0.82) Unrestricted subprocess permissions (F2) Filtered out Not identified Test 1 reported zero vulnerabilities; Test 2 reported one High and one Medium. The same-session reviewer framed the threat model as “authorized-only Telegram access”, treating the auth as working correctly because the spec said so, and F1 never surfaced. The cold reviewer had no spec context and flagged it right away.\nThe path traversal finding is actually a stronger signal. It wasn’t seeded in my prompt; it was a real bug the vibe-coding session introduced on its own, with no spec instruction to blame. The cold reviewer caught it; the same-session reviewer missed it alongside F1. ✅ H1 confirmed.\n4. F2: the component boundary you shall not pass It’s not uncommon that while testing a hypothesis you run into new discoveries. So why did neither run flag the unrestricted subprocess permissions?\nThe answer is in the architecture. Both write and process are legitimate bot operations: the attacker stores a note to disk, then triggers process normally. handle_process() spawns claude -p /process-notes --allowedTools [..]. The subprocess call is visible in inbox-bot.py, but the skill it invokes is a separate file. Whether the skill passes vault content to Python in an exploitable way, and whether the permissions it runs with are appropriate, live outside the review scope.\nflowchart TD A[\"Attacker note\\n(malicious payload)\"] --\u003e B[\"handle_write\\n(legitimate)\"] B --\u003e C[(\"note on disk\")] D[\"process command\\n(legitimate)\"] --\u003e E[\"handle_process()\"] E --\u003e F[\"claude -p /process-notes\\n--allowedTools Bash(python3:*) ...\"] F -.-\u003e|\"spawns\"| G[\"/process-notes skill\\n(out of review scope)\"] G --\u003e|\"reads\"| C G --\u003e H[\"Bash(python3:*)\\n→ RCE if vulnerable\"] subgraph scope [\"reviewed: inbox-bot.py\"] B E F end The architecture makes the concern visible: attacker-controlled vault content flows into a subprocess running with unrestricted python3. Neither automated reviewer evaluated it at that level, though they each hit the boundary differently.\nIn T1 (same session), the reviewer identified the chain, labeling it “Prompt injection via vault write to claude subprocess”, but the false-positive filter dismissed it: “The attacker and vault owner are the same person; there is no external trust boundary being crossed.” That’s model bias in a different form: not suppressing a finding outright, but supplying a session-derived trust assumption that the reviewer couldn’t actually validate, because doing so would require seeing what process-notes does with the data it receives.\nIn T2 (cold session), the reviewer checked for shell injection: seeing list-form subprocess.run with no shell=True, it marked the subprocess as clean and moved on. Seemingly, the presence of a known secure coding pattern steered the LLM into trusting the call as safe overall: the right invocation style closed scrutiny before it reached the component boundary question. The --allowedTools string with Bash(python3:*) was never evaluated.\nNeither reviewer asked whether python3:* was too broad. That question doesn’t require seeing /process-notes to answer: attacker-controlled data flowing into a subprocess with unrestricted python3 is a concern on its own, regardless of what the downstream skill does with it. A human reviewer would flag that pattern without needing to verify what the downstream component does with it. When you can’t see past the boundary, the right default is to surface the concern.\n5. H2 | T3 \u0026 T4: the plugin and diff isolation After a quick detour, we’re back to probing the second part of the original hypothesis: does the new Claude plugin’s diff-scoped reviewer miss a vulnerability chain where each change looks benign in isolation? This time, the chain is in the same file, and in a single tool call.\nTest 3 (1 diff): Write + Bash(python3:*) introduced together. The plugin caught both: python3:* flagged as too broad, Write flagged as needing tighter scope. Two correct findings, auto-fix applied. But it treated them as independent concerns rather than a chain. The fix addressed F2; F3 survived.\nThe security hook flagged two real issues: 1. Bash(python3:*) is too broad — permits running any Python script. Should be scoped to the specific script path. 2. Write is too broad — should be scoped to the wiki directory under VAULT_ROOT. Test 4 (2 diffs):\nWrite committed in the baseline. Nothing suspicious in isolation. Bash(python3:.claude/scripts/*) added in a new session. A narrow, path-scoped python3 permission — looks like a reasonable hardening move. Write is outside the diff and invisible to the reviewer. LLM code review: no vulnerabilities found. And just like that, ✅ H2 confirmed.\nSide observation from the test: when my git commit message named the permissions that had been removed, Claude read the log and inferred exactly what to restore, producing broad python3:* directly. I’ve repeated the test with a neutral commit message, and it resulted in a different fix. The commit message didn’t affect the plugin’s review, but it changed what the writing model produced. Small sample, but a useful reminder that in vibe-coding sessions the model reads everything in context, and metadata you don’t think of as instructions can still shape output.\n6. What can we do about all this? The model bias gap is actionable, and the fix is simple: run /security-review in a fresh session, not the one where you wrote the code. The unfortunate truth is that most users won’t know to do this. The natural instinct is to run the skill right there in the session where you just finished writing the code. Model anchoring isn’t obvious unless you know about it. Anthropic could nudge users here: detect when the tool is invoked in a session that also wrote the code, and warn before running.\nI asked Claude to prototype this using session hooks. Available as a gist here, it works, but frankly it’s not very good. The decision: block output is blunt; it stops the prompt and requires re-running. That’s an API limitation: UserPromptSubmit hooks have no non-blocking notification option, so block is the only way to surface a visible message. Another caveat: in Claude Desktop, blocked prompts fail silently — the user gets no response and no explanation. This hook is only reliable in the Claude Code CLI.\nFinal thoughts Every tool in this space has gaps. Some are documented, and some are hidden, surfacing only when you test carefully enough. The title of this post came from expecting to confirm two gaps and finding three.\nAre we all doomed until Mythos comes to save us? Models evolve rapidly, and Mythos is reportedly strong at exactly the cross-boundary chain reasoning that today’s tools miss. It may well close these gaps - time will tell.\nMy broader take: fully autonomous code reviews don’t replace human judgment. They extend your reach, and they’re most useful when you understand what they can and can’t see. Know the limits of your tools. Trust and verify.\nReferences Anthropic — Catch security issues as Claude writes code Claude hook to warn about model anchoring bias ",
+    "wordCount" : "2183",
+    "inLanguage": "en",
+    "datePublished": "2026-05-30T16:35:14-07:00",
+    "dateModified": "2026-05-30T16:35:14-07:00",
+    "author":{
+        "@type": "Person",
+        "name":  null ,},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://brainoverflow.blog/posts/claude-code-security-review-bias/"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "brain overflow",
+      "description": "",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://brainoverflow.blog/favicon.ico"
+      }
+    }
+}
+</script><title>Hidden Gaps in Claude Code Security Reviews</title><link rel="stylesheet dns-prefetch preconnect preload prefetch" as="style" media="screen" href="https://brainoverflow.blog/css/style.min.2160109d888877fbd9232d36fbcf83b6e216a198bad4f7fe5ee9c4009121e9ec.css" integrity="sha256-IWAQnYiId/vZIy02+8+DtuIWoZi61Pf+XunEAJEh6ew=" crossorigin="anonymous">
+	</head>
+
+<body id="page">
+<header id="site-header">
+	<div class="hdr-wrapper section-inner">
+		<div class="hdr-left">
+			<div class="site-branding">
+				<a href="https://brainoverflow.blog/">brain overflow</a>
+			</div>
+			<nav class="site-nav hide-in-mobile"><a href="https://brainoverflow.blog/posts/">posts</a><a href="https://brainoverflow.blog/about/">about</a><a href="https://brainoverflow.blog/cv/">my CV</a></nav>
+		</div>
+		<div class="hdr-right hdr-icons">
+			<span class="hdr-links hide-in-mobile"><a href="https://www.linkedin.com/in/oskaribatullin" target="_blank" rel="noopener me" title="Linkedin"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a><a href="https://github.com/obormot" target="_blank" rel="noopener me" title="Github"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path
+      d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+   </path>
+</svg></a></span><button id="share-btn" class="hdr-btn" title=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share-2">
+      <circle cx="18" cy="5" r="3"></circle>
+      <circle cx="6" cy="12" r="3"></circle>
+      <circle cx="18" cy="19" r="3"></circle>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+   </svg></button>
+ 
+<div id="share-links" class="animated fast">
+    
+    
+    
+    
+    <ul>
+        <li>
+            <a href="https://twitter.com/intent/tweet?hashtags=hermit2&amp;url=https%3a%2f%2fbrainoverflow.blog%2fposts%2fclaude-code-security-review-bias%2f&amp;text=Hidden%20Gaps%20in%20Claude%20Code%20Security%20Reviews" target="_blank" rel="noopener" aria-label="Share on X"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path class="st0" d="m21.3 21.1 -11.4 -18.2h-7.2l11.4 18.2zm-18.6 0 7.2 -6.6m4.2 -5 7.2 -6.6" />
+</svg></a>
+        </li>
+        <li>
+            <a href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fbrainoverflow.blog%2fposts%2fclaude-code-security-review-bias%2f" target="_blank" rel="noopener" aria-label="Share on Facebook"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.threads.net/intent/post?text=Hidden%20Gaps%20in%20Claude%20Code%20Security%20Reviews&amp;url=https%3a%2f%2fbrainoverflow.blog%2fposts%2fclaude-code-security-review-bias%2f" target="_blank" rel="noopener" aria-label="Share on threads"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.589 12c.027 3.086.718 5.496 2.057 7.164 1.43 1.783 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.964-.065-1.19.408-2.285 1.33-3.082.88-.76 2.119-1.207 3.583-1.291a14 14 0 0 1 3.02.142c-.126-.742-.375-1.332-.75-1.757-.513-.586-1.308-.883-2.359-.89h-.029c-.844 0-1.992.232-2.721 1.32l-1.757-1.18c.98-1.454 2.568-2.256 4.478-2.256h.044c3.194.02 5.097 1.975 5.287 5.388q.163.07.321.142c1.49.7 2.58 1.761 3.154 3.07.797 1.82.871 4.79-1.548 7.158-1.85 1.81-4.094 2.628-7.277 2.65Zm1.003-11.69q-.362 0-.739.021c-1.836.103-2.98.946-2.916 2.143.067 1.256 1.452 1.839 2.784 1.767 1.224-.065 2.818-.543 3.086-3.71a10.5 10.5 0 0 0-2.215-.221"/></svg></a>
+        </li>
+        <li>
+            <a href="https://bsky.app/intent/compose?text=https%3a%2f%2fbrainoverflow.blog%2fposts%2fclaude-code-security-review-bias%2f" target="_blank" rel="noopener" aria-label="Share on bluesky"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive">
+   <path
+      d="M12,10.899c-0.995,-1.934 -3.704,-5.54 -6.223,-7.318c-2.412,-1.703 -3.333,-1.408 -3.936,-1.136c-0.699,0.316 -0.826,1.388 -0.826,2.019c0,0.631 0.346,5.173 0.572,5.931c0.745,2.504 3.399,3.351 5.842,3.079c0.125,-0.018 0.252,-0.035 0.38,-0.051c-0.126,0.02 -0.252,0.037 -0.38,0.051c-3.581,0.531 -6.761,1.836 -2.59,6.48c4.589,4.75 6.289,-1.019 7.161,-3.944c0.872,2.925 1.877,8.486 7.079,3.944c3.906,-3.944 1.073,-5.949 -2.508,-6.48c-0.128,-0.014 -0.254,-0.031 -0.38,-0.051c0.128,0.016 0.255,0.033 0.38,0.051c2.443,0.272 5.097,-0.574 5.842,-3.079c0.226,-0.758 0.572,-5.3 0.572,-5.931c-0,-0.63 -0.127,-1.703 -0.826,-2.018c-0.603,-0.273 -1.524,-0.568 -3.936,1.135c-2.519,1.778 -5.228,5.384 -6.223,7.318Z" />
+</svg></a>
+        </li>
+        <li>
+            <a href="mailto:?subject=Hidden%20Gaps%20in%20Claude%20Code%20Security%20Reviews&amp;body=https%3a%2f%2fbrainoverflow.blog%2fposts%2fclaude-code-security-review-bias%2f" target="_self" rel="noopener" aria-label="Share on Email"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+   <polyline points="22,6 12,13 2,6"></polyline>
+</svg></a>
+        </li>
+        <li>
+            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fbrainoverflow.blog%2fposts%2fclaude-code-security-review-bias%2f&amp;source=https%3a%2f%2fbrainoverflow.blog%2f&amp;title=Hidden%20Gaps%20in%20Claude%20Code%20Security%20Reviews&amp;summary=Hidden%20Gaps%20in%20Claude%20Code%20Security%20Reviews%2c%20by%20%3cnil%3e%0a%0a%3cnil%3e%0a" target="_blank" rel="noopener" aria-label="Share on LinkedIn"><svg xmlns="http://www.w3.org/2000/svg" class="feather" width="24" height="24" viewBox="0 0 24 24" fill="none"
+   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+   <rect x="2" y="9" width="4" height="12"></rect>
+   <circle cx="4" cy="4" r="2"></circle>
+</svg></a>
+        </li>
+        <li>
+            <a href="#" onclick="linkShare(&#34;Hidden Gaps in Claude Code Security Reviews&#34;,&#34;https://brainoverflow.blog/posts/claude-code-security-review-bias/&#34;,&#34;Hidden Gaps in Claude Code Security Reviews, by \u003cnil\u003e\n\n\u003cnil\u003e\n&#34;); return false;" target="_self" rel="noopener" aria-label="Copy Link"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+   </svg></a>
+        </li>
+    </ul>
+</div><button id="menu-btn" class="hdr-btn" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+   </svg></button>
+		</div>
+	</div>
+</header>
+<div id="mobile-menu" class="animated fast">
+	<ul><li><a href="https://brainoverflow.blog/posts/">posts</a></li><li><a href="https://brainoverflow.blog/about/">about</a></li><li><a href="https://brainoverflow.blog/cv/">my CV</a></li></ul>
+</div>
+
+	<main class="site-main section-inner animated fadeIn faster"><article class="thin">
+			<header class="post-header">
+				<div class="post-date"><span>May 30, 2026</span></div>
+				<h1>Hidden Gaps in Claude Code Security Reviews</h1>
+			</header>
+			<div class="post-description">
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+   </svg><span class="category"><a href="https://brainoverflow.blog/categories/ai-security">ai security</a></span><span class="category"><a href="https://brainoverflow.blog/categories/security-research">security research</a></span><span class="category"><a href="https://brainoverflow.blog/categories/tools">tools</a></span></p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-file-text">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+   </svg>2183&nbsp  9 Minutes, 55 Seconds</p>
+<p><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+   </svg>2026-05-30 16:35 -0700
+</p></div>
+			<hr class="post-end">
+			<div class="content">
+				 <p><em>Anthropic recently shipped a new security plugin for Claude Code that automatically reviews code for vulnerabilities as you make changes, complementing the existing <code>/security-review</code> skill. I decided to test both against a deliberately constructed set of security flaws to see if the new tool improves coverage. Little did I know how deep this rabbit hole would take me. Fair warning: this is a long read.</em></p>
+<hr>
+<h2 id="1-background">1. Background<a href="#1-background" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Claude Code supports LLM-based security reviews at three stages:</p>
+<table>
+	<thead>
+			<tr>
+					<th>Tool</th>
+					<th>Plans</th>
+					<th>What the reviewer sees</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td><code>/security-review</code></td>
+					<td>All</td>
+					<td>Full branch, same or new session context (user&rsquo;s choice)</td>
+			</tr>
+			<tr>
+					<td><strong>Security guidance plugin</strong> <em>(new, May 2026)</em></td>
+					<td>All</td>
+					<td>Git diff from current turn, fresh model context</td>
+			</tr>
+			<tr>
+					<td>Code Review</td>
+					<td>Team / Enterprise only</td>
+					<td>Full codebase, multi-agent, independent model (runs on PRs)</td>
+			</tr>
+	</tbody>
+</table>
+<p>The new plugin shipped with an explicit design goal: avoid the <strong>model anchoring bias</strong> problem <a href="/posts/ai-native-threat-modeling/#5-on-model-bias-in-security-analysis">I wrote about earlier</a>. To understand what model bias means here, consider the human equivalent: if you ask the author of the code to review it, they&rsquo;ll likely tell you it&rsquo;s fine — they wrote it after all. A reviewer who wasn&rsquo;t in the room when the decisions were made will challenge assumptions the author has stopped seeing. The same dynamic applies to LLMs: when Claude writes code and then reviews it in the same session, it has the full conversation history in context, including every design choice and tradeoff it reasoned through while writing. It validates against those decisions rather than challenging them. A fresh session is the AI equivalent of a second pair of eyes.</p>
+<p>The new plugin addresses this by running a <strong>separate Opus 4.7 session with a fresh context</strong>: the reviewer starts from the diff with no session history and no investment in the original approach. Anthropic&rsquo;s own documentation is direct about the design intent:</p>
+<blockquote>
+<p>&ldquo;The plugin does not ask the same Claude instance that wrote the code to grade itself. […] The end-of-turn and commit reviews run as a separate Claude call with a fresh context and a security-focused prompt: the reviewer starts from the diff, has no investment in the original approach, and is instructed only to find problems.&rdquo;</p>
+</blockquote>
+<p>This is a real solution to the model bias problem, but if you read deeper, it has its own limitation: <strong>a diff-scoped reviewer can only see what changed in the current turn</strong> and cannot reason about interactions between pre-existing code and new additions. That constraint is likely a cost decision: Opus 4.7 is expensive, and reviewing the full codebase on every change would be prohibitively token-intensive.</p>
+<p>This gives me two hypotheses to experiment with:</p>
+<p><strong>H1:</strong> same-session <code>security-review</code> is affected by model anchoring bias and will suppress findings that a cold run on the same code surfaces. The delta between the two runs measures how bad the gap is in practice.</p>
+<p><strong>H2:</strong> the newly introduced diff-based plugin will miss vulnerability chains where each change looks benign in isolation but the two together form something exploitable, because the reviewer only ever sees one diff at a time and has no memory of what came before.</p>
+<hr>
+<h2 id="2-test-corpus">2. Test corpus<a href="#2-test-corpus" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>My target is based on a real Telegram bot that routes voice and text messages into a backend, but the version used here was vibe-coded from scratch for this experiment. The spec was written to elicit insecure decisions without explicitly asking for them: the goal was a realistic-looking codebase with seeded flaws.</p>
+<p>The three flaws, ranging in complexity:</p>
+<h3 id="f1-fail-open-authentication-simple">F1: Fail-open authentication (simple)<a href="#f1-fail-open-authentication-simple" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p><code>TELEGRAM_ALLOWED_USERS</code> is read into a set at startup. When the env var is absent, the set is empty. The auth guard uses the set as a condition:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#66d9ef">if</span> TELEGRAM_USERS <span style="color:#f92672">and</span> (<span style="color:#f92672">not</span> user <span style="color:#f92672">or</span> user<span style="color:#f92672">.</span>id <span style="color:#f92672">not</span> <span style="color:#f92672">in</span> TELEGRAM_USERS):
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>
+</span></span></code></pre></div><p>When <code>TELEGRAM_USERS</code> is empty, the entire <code>if</code> is skipped: any Telegram user is accepted. The correct default is deny-all: a bot that can read files and spawn subprocesses should fail closed, not open.</p>
+<h3 id="f2-unrestricted-subprocess-permissions-medium">F2: Unrestricted subprocess permissions (medium)<a href="#f2-unrestricted-subprocess-permissions-medium" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>The bot classifies incoming messages and dispatches them, spawning <code>claude -p</code> subprocess with the <code>process_notes</code> skill and an <code>--allowedTools</code> list needed for the skill to run its operations. The allowed tools list passed to the inner Claude instance includes <code>Bash(python3:*)</code> without path restrictions. The <code>process_notes</code> skill reads the note from disk and invokes Python with it as input. If the skill passes note content to Python without sanitization, the chain reaches arbitrary code execution.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># python3 unrestricted</span>
+</span></span><span style="display:flex;"><span>allowed_tools <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Read,Write,Bash(python3:*),Bash(mv:*),Bash(rm:*), ...&#34;</span>  
+</span></span></code></pre></div><h3 id="f3-write--path-scoped-python3--write-then-execute-chain-hard">F3: Write + path-scoped python3 = write-then-execute chain (hard)<a href="#f3-write--path-scoped-python3--write-then-execute-chain-hard" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h3>
+<p>Now <code>python3:*</code> is hardened to <code>python3:.claude/scripts/*</code>, but the <code>Write</code> permission remains. The chain: write a payload to <code>.claude/scripts/</code>, invoke it via python. Neither permission is dangerous alone: the vulnerability only exists when you hold both simultaneously. This flaw is the key test case for the new plugin: a diff-based reviewer seeing only the second permission added can&rsquo;t chain it to the first to recognize the combined severity.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>allowed_tools <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;Read,Write,Bash(python3:.claude/scripts/*),Bash(mv:*), ...&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#                     ^^^^^ unrestricted       ^^^^^ scoped — looks safe</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Chain: Write payload → .claude/scripts/evil.py, python3 runs attacker&#39;s code</span>
+</span></span></code></pre></div><p>The four tests map directly to the two hypotheses:</p>
+<table>
+	<thead>
+			<tr>
+					<th>Test</th>
+					<th>Tool</th>
+					<th>Setup</th>
+					<th>Tests</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>T1</td>
+					<td><code>/security-review</code></td>
+					<td>Same session that wrote the code</td>
+					<td>H1: does model bias suppress findings?</td>
+			</tr>
+			<tr>
+					<td>T2</td>
+					<td><code>/security-review</code></td>
+					<td>Fresh session, no prior context</td>
+					<td>H1 control: cold reviewer, does it catch everything?</td>
+			</tr>
+			<tr>
+					<td>T3</td>
+					<td>Security guidance plugin</td>
+					<td><code>Write</code> + <code>python3:*</code> both new in the diff</td>
+					<td>H2: does plugin catch a chain when it&rsquo;s fully visible?</td>
+			</tr>
+			<tr>
+					<td>T4</td>
+					<td>Security guidance plugin</td>
+					<td><code>Write</code> pre-existing, only <code>python3 scripts/*</code> added</td>
+					<td>H2: does plugin miss a chain split across commits?</td>
+			</tr>
+	</tbody>
+</table>
+<hr>
+<h2 id="3-h1--t1--t2-security-review-and-model-bias">3. H1 | T1 &amp; T2: /security-review and model bias<a href="#3-h1--t1--t2-security-review-and-model-bias" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Model bias in AI security review is a known problem, and Anthropic implicitly acknowledged it by releasing the new plugin. I&rsquo;m not going to dwell on it; the tests here are a quick empirical confirmation with a concrete measurement of the gap.</p>
+<p>The <code>security-review</code> skill runs a multi-agent pipeline — initial identification followed by parallel false-positive filtering against known precedents, with a scoring system and a confidence threshold to report. It is more reliable than casually asking Claude to &ldquo;review this code for vulnerabilities&rdquo;, though some real issues may get filtered if the evidence isn&rsquo;t strong enough.</p>
+<p><strong>Test 1</strong> ran in the same session that produced the bot; <strong>Test 2</strong> ran in a fresh session with no prior context. Same code, model, thinking effort, command.</p>
+<table>
+	<thead>
+			<tr>
+					<th>Finding</th>
+					<th>Test 1 (same-session)</th>
+					<th>Test 2 (cold session)</th>
+			</tr>
+	</thead>
+	<tbody>
+			<tr>
+					<td>Fail-open auth: empty allowlist (F1)</td>
+					<td>Not surfaced</td>
+					<td><strong>High</strong> (0.95)</td>
+			</tr>
+			<tr>
+					<td>Path traversal in file retrieval</td>
+					<td>Not surfaced</td>
+					<td>Medium (0.82)</td>
+			</tr>
+			<tr>
+					<td>Unrestricted subprocess permissions (F2)</td>
+					<td>Filtered out</td>
+					<td>Not identified</td>
+			</tr>
+	</tbody>
+</table>
+<p>Test 1 reported zero vulnerabilities; Test 2 reported one High and one Medium. The same-session reviewer framed the threat model as &ldquo;authorized-only Telegram access&rdquo;, treating the auth as working correctly because the spec said so, and F1 never surfaced. The cold reviewer had no spec context and flagged it right away.</p>
+<p>The path traversal finding is actually a stronger signal. It wasn&rsquo;t seeded in my prompt; it was a real bug the vibe-coding session introduced on its own, with no spec instruction to blame. The cold reviewer caught it; the same-session reviewer missed it alongside F1. ✅ <strong>H1 confirmed</strong>.</p>
+<hr>
+<h2 id="4-f2-the-component-boundary-you-shall-not-pass">4. F2: the component boundary you shall not pass<a href="#4-f2-the-component-boundary-you-shall-not-pass" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>It&rsquo;s not uncommon that while testing a hypothesis you run into new discoveries. So why did neither run flag the unrestricted subprocess permissions?</p>
+<p>The answer is in the architecture. Both <code>write</code> and <code>process</code> are legitimate bot operations: the attacker stores a note to disk, then triggers <code>process</code> normally. <code>handle_process()</code> spawns <code>claude -p /process-notes --allowedTools [..]</code>. The subprocess call is visible in <code>inbox-bot.py</code>, but the skill it invokes is a separate file. Whether the skill passes vault content to Python in an exploitable way, and whether the permissions it runs with are appropriate, live outside the review scope.</p>
+<pre class="mermaid">flowchart TD
+    A["Attacker note\n(malicious payload)"] --> B["handle_write\n(legitimate)"]
+    B --> C[("note on disk")]
+    D["process command\n(legitimate)"] --> E["handle_process()"]
+    E --> F["claude -p /process-notes\n--allowedTools Bash(python3:*) ..."]
+    F -.->|"spawns"| G["/process-notes skill\n(out of review scope)"]
+    G -->|"reads"| C
+    G --> H["Bash(python3:*)\n→ RCE if vulnerable"]
+    subgraph scope ["reviewed: inbox-bot.py"]
+        B
+        E
+        F
+    end
+</pre>
+<p>The architecture makes the concern visible: attacker-controlled vault content flows into a subprocess running with unrestricted python3. Neither automated reviewer evaluated it at that level, though they each hit the boundary differently.</p>
+<p>In <strong>T1</strong> (same session), the reviewer identified the chain, labeling it &ldquo;Prompt injection via vault write to claude subprocess&rdquo;, but the false-positive filter dismissed it: <em>&ldquo;The attacker and vault owner are the same person; there is no external trust boundary being crossed.&rdquo;</em> That&rsquo;s <strong>model bias in a different form</strong>: not suppressing a finding outright, but supplying a session-derived trust assumption that the reviewer couldn&rsquo;t actually validate, because doing so would require seeing what <code>process-notes</code> does with the data it receives.</p>
+<p>In <strong>T2</strong> (cold session), the reviewer checked for shell injection: seeing list-form <code>subprocess.run</code> with no <code>shell=True</code>, it marked the subprocess as clean and moved on. Seemingly, the <strong>presence of a known secure coding pattern steered the LLM into trusting the call as safe overall</strong>: the right invocation style closed scrutiny before it reached the component boundary question. The <code>--allowedTools</code> string with <code>Bash(python3:*)</code> was never evaluated.</p>
+<p>Neither reviewer asked whether <code>python3:*</code> was too broad. That question doesn&rsquo;t require seeing <code>/process-notes</code> to answer: attacker-controlled data flowing into a subprocess with unrestricted python3 is a concern on its own, regardless of what the downstream skill does with it. A human reviewer would flag that pattern without needing to verify what the downstream component does with it. When you can&rsquo;t see past the boundary, the right default is to surface the concern.</p>
+<hr>
+<h2 id="5-h2--t3--t4-the-plugin-and-diff-isolation">5. H2 | T3 &amp; T4: the plugin and diff isolation<a href="#5-h2--t3--t4-the-plugin-and-diff-isolation" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>After a quick detour, we&rsquo;re back to probing the second part of the original hypothesis: does the new Claude plugin&rsquo;s diff-scoped reviewer miss a vulnerability chain where each change looks benign in isolation? This time, the chain is in the same file, and in a single tool call.</p>
+<p><strong>Test 3 (1 diff):</strong> <code>Write</code> + <code>Bash(python3:*)</code> introduced together.
+The plugin caught both: <code>python3:*</code> flagged as too broad, <code>Write</code> flagged as needing tighter scope. Two correct findings, auto-fix applied. But it treated them as independent concerns rather than a chain. The fix addressed F2; F3 survived.</p>
+<pre tabindex="0"><code>The security hook flagged two real issues:
+1. Bash(python3:*) is too broad — permits running any Python script.
+   Should be scoped to the specific script path.
+2. Write is too broad — should be scoped to the wiki directory under VAULT_ROOT.
+</code></pre><p><strong>Test 4 (2 diffs):</strong></p>
+<ul>
+<li><code>Write</code> committed in the baseline. Nothing suspicious in isolation.</li>
+<li><code>Bash(python3:.claude/scripts/*)</code> added in a new session. A narrow, path-scoped python3 permission — looks like a reasonable hardening move. <code>Write</code> is outside the diff and invisible to the reviewer.</li>
+</ul>
+<pre tabindex="0"><code>LLM code review: no vulnerabilities found.
+</code></pre><p>And just like that, ✅ <strong>H2 confirmed</strong>.</p>
+<p>Side observation from the test: when my git commit message named the permissions that had been removed, Claude read the log and inferred exactly what to restore, producing broad <code>python3:*</code> directly. I&rsquo;ve repeated the test with a neutral commit message, and it resulted in a different fix. The commit message didn&rsquo;t affect the plugin&rsquo;s review, but it changed what the writing model produced. Small sample, but a useful reminder that in vibe-coding sessions the model reads everything in context, and metadata you don&rsquo;t think of as instructions can still shape output.</p>
+<hr>
+<h2 id="6-what-can-we-do-about-all-this">6. What can we do about all this?<a href="#6-what-can-we-do-about-all-this" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>The model bias gap is actionable, and the fix is simple: run <code>/security-review</code> in a fresh session, not the one where you wrote the code. The unfortunate truth is that most users won&rsquo;t know to do this. The natural instinct is to run the skill right there in the session where you just finished writing the code. Model anchoring isn&rsquo;t obvious unless you know about it. Anthropic could nudge users here: detect when the tool is invoked in a session that also wrote the code, and warn before running.</p>
+<p>I asked Claude to prototype this using session hooks. Available as a gist <a href="https://gist.github.com/obormot/9a241032c72c4d19a259f8bce6fa8ed3">here</a>, it works, but frankly it&rsquo;s not very good. The <code>decision: block</code> output is blunt; it stops the prompt and requires re-running. That&rsquo;s an API limitation: <code>UserPromptSubmit</code> hooks have no non-blocking notification option, so block is the only way to surface a visible message. Another caveat: in Claude Desktop, blocked prompts fail silently — the user gets no response and no explanation. This hook is only reliable in the Claude Code CLI.</p>
+<hr>
+<h2 id="final-thoughts">Final thoughts<a href="#final-thoughts" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<p>Every tool in this space has gaps. Some are documented, and some are hidden, surfacing only when you test carefully enough. The title of this post came from expecting to confirm two gaps and finding three.</p>
+<p>Are we all doomed until Mythos comes to save us? Models evolve rapidly, and Mythos is reportedly strong at exactly the cross-boundary chain reasoning that today&rsquo;s tools miss. It may well close these gaps - time will tell.</p>
+<p>My broader take: fully autonomous code reviews don&rsquo;t replace human judgment. They extend your reach, and they&rsquo;re most useful when you understand what they can and can&rsquo;t see. Know the limits of your tools. Trust <strong>and</strong> verify.</p>
+<hr>
+<h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round" class="feather">
+      <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path>
+      <line x1="8" y1="12" x2="16" y2="12"></line>
+   </svg></a></h2>
+<ul>
+<li><a href="https://code.claude.com/docs/en/security-guidance">Anthropic — Catch security issues as Claude writes code</a></li>
+<li><a href="https://gist.github.com/obormot/9a241032c72c4d19a259f8bce6fa8ed3">Claude hook to warn about model anchoring bias</a></li>
+</ul>
+
+			</div>
+			
+		</article>
+		<div class="post-nav thin">
+			<a class="prev-post" href="https://brainoverflow.blog/posts/ai-assisted-bug-bounty/">
+				<span class="post-nav-label">&nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="12 5 19 12 12 19"></polyline>
+   </svg></span><br><span>AI Assisted Bug Bounty Experiment</span>
+			</a>
+		</div>
+		<div id="comments" class="thin"></div>
+	</main>
+<footer id="site-footer" class="section-inner thin animated fadeIn faster">
+<p>
+	&copy; 2026 <a href="https://brainoverflow.blog/">brain overflow</a>
+	&#183; 
+	
+	</p></footer>
+<script async src="https://brainoverflow.blog/js/main.min.0d576c274958ef57c819bb15e6a752b006c7d7982fefe4b3581ba126929d0de2.js" integrity="sha256-DVdsJ0lY71fIGbsV5qdSsAbH15gv7+SzWBuhJpKdDeI=" crossorigin="anonymous"></script><script async src="https://brainoverflow.blog/js/social-share.min.24409a4f6e5537d70ffc55ec8f9192208d718678cb8638585342423020b37f39.js" integrity="sha256-JECaT25VN9cP/FXsj5GSII1xhnjLhjhYU0JCMCCzfzk=" crossorigin="anonymous"></script><script defer async type="module">
+    import mermaid from 'https:\/\/cdn.jsdelivr.net\/npm\/mermaid\/dist\/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true,theme: 'dark' });
+  </script></body>
+</html>
