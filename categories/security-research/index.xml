@@ -4,7 +4,7 @@
 		<title>Security Research on brain overflow</title>
 		<link>https://brainoverflow.blog/categories/security-research/</link>
 		<description>Recent content in Security Research on brain overflow</description>
-		<generator>Hugo -- 0.162.0</generator>
+		<generator>Hugo -- 0.162.1</generator>
 		<language>en-us</language>
 		<lastBuildDate>Sun, 24 May 2026 13:01:31 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/categories/security-research/index.xml" rel="self" type="application/rss+xml" />
@@ -282,6 +282,13 @@
 			</tr>
 	</tbody>
 </table>
+<hr>
+<blockquote>
+<p><strong>UPDATE — June 3, 2026</strong></p>
+<p>This post was published on May 2nd, while waiting for xint&rsquo;s container-escape follow-up. Both that and a community PoC have since landed.</p>
+<p><strong>xint.io part 2 is out.</strong> Their <a href="https://xint.io/blog/copy-fail-pod-to-host">container escape follow-up</a> (May 19) covers three paths. Two of them — shared-layer DaemonSet poisoning (what this post covers) and hostPath-mounted DaemonSets reaching host-side binaries — require layer overlap between the attacker&rsquo;s image and a privileged workload. The third doesn&rsquo;t: runc is bind-mounted read-only into every container via <code>/proc/self/exe</code>, so the attacker can poison the host runc binary directly through the page cache with no shared layer needed. That removes the biggest constraint on the container escape.</p>
+<p><strong>PoC validated across major cloud providers.</strong> Percivalll published a <a href="https://github.com/Percivalll/Copy-Fail-CVE-2026-31431-Kubernetes-PoC/">proof-of-concept</a> demonstrating all three escape paths against production k8s clusters on Alibaba Cloud ACK, Amazon EKS, and Google GKE, including the runc path.</p>
+</blockquote>
 <hr>
 <h2 id="references">References<a href="#references" class="anchor" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round" class="feather">
