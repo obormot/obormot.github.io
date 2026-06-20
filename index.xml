@@ -4,7 +4,7 @@
 		<title>brain overflow</title>
 		<link>https://brainoverflow.blog/</link>
 		<description>Recent content on brain overflow</description>
-		<generator>Hugo -- 0.162.1</generator>
+		<generator>Hugo -- 0.163.0</generator>
 		<language>en-us</language>
 		<lastBuildDate>Sat, 06 Jun 2026 09:00:00 -0700</lastBuildDate>
 		<atom:link href="https://brainoverflow.blog/index.xml" rel="self" type="application/rss+xml" />
@@ -1620,15 +1620,6 @@ approach. An old technique that still holds up in the agentic age.</p>
 <p>The shared KV cache is not just an information channel — it is also a resource that can be weaponized against co-tenants. The attack requires one API key and a loop. The attacker minimizes output tokens; the victim pays for repeated full re-prefill. Whether that translates into a cost advantage for the attacker depends on the deployment&rsquo;s pricing structure, but the latency degradation is real regardless.</p>
 <p>The root cause is the same as for the timing side-channel: cache entries are keyed by token sequence without tenant identity. The mitigations are tenant-scoped cache keys, per-tenant cache quotas, and rate limits — or economic leverage that raises the attacker&rsquo;s cost: write premiums and minimum cacheable prompt sizes.</p>
 <hr>
-]]></content>
-		</item>
-		
-		<item>
-			<title>My CV</title>
-			<link>https://brainoverflow.blog/cv/</link>
-			<pubDate>Sun, 26 Apr 2026 13:55:00 -0700</pubDate><guid>https://brainoverflow.blog/cv/</guid>
-			<description><![CDATA[&lt;no value&gt;]]></description><content type="text/html" mode="escaped"><![CDATA[<p>I&rsquo;m currently open to full-time opportunities, mainly targeting Senior+/Staff-level roles in Product Security, Application Security, and AI Threat Research in San Francisco Bay Area (Hybrid or Remote).</p>
-<p><a href="files/Oskar_Ibatullin_CV_2026_.pdf">Download my CV (PDF)</a>. Contact info is redacted; feel free to reach me on <a href="https://www.linkedin.com/in/oskaribatullin">LinkedIn</a>.</p>
 ]]></content>
 		</item>
 		

@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
@@ -68,9 +67,6 @@
   </url><url>
     <loc>https://brainoverflow.blog/posts/kv-cache-flood-dos/</loc>
     <lastmod>2026-04-27T01:53:01-07:00</lastmod>
-  </url><url>
-    <loc>https://brainoverflow.blog/cv/</loc>
-    <lastmod>2026-04-26T13:55:00-07:00</lastmod>
   </url><url>
     <loc>https://brainoverflow.blog/about/</loc>
     <lastmod>2026-04-26T13:41:00-07:00</lastmod>
